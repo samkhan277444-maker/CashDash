@@ -11,35 +11,36 @@ from google.oauth2.service_account import Credentials
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- CUSTOM CSS (Excel Dashboard Layout) ----------
+# ---------- MOBILE-FIRST RESPONSIVE CSS ----------
 st.markdown("""
 <style>
     .stApp { background-color: #f1f3f6; color: #1e293b; }
     .sheet-card {
         background: #ffffff;
         border-radius: 8px;
-        padding: 12px 15px;
+        padding: 10px 12px;
         margin-bottom: 10px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         border: 1px solid #e2e8f0;
         text-align: center;
+        min-width: 120px;
     }
     .sheet-card-header {
         color: #64748b;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: 600;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
         text-transform: uppercase;
     }
     .sheet-card-value {
-        font-size: 1.6rem;
+        font-size: 1.4rem;
         font-weight: 700;
         color: #0f172a;
     }
     .sheet-card-sub {
-        font-size: 0.7rem;
+        font-size: 0.6rem;
         color: #94a3b8;
-        margin-top: 4px;
+        margin-top: 2px;
     }
     .stButton button {
         width: 100%;
@@ -47,17 +48,22 @@ st.markdown("""
         font-weight: 600;
         border: none;
     }
-    .btn-green { background: #10b981; color: white; }
-    .btn-red { background: #ef4444; color: white; }
-    .btn-blue { background: #3b82f6; color: white; }
-    .btn-orange { background: #f59e0b; color: white; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;}
-    @media (max-width: 768px) { .sheet-card-value { font-size: 1.2rem; } }
+    
+    /* Mobile responsiveness: stack columns */
+    @media (max-width: 768px) {
+        .sheet-card { min-width: 80px; padding: 8px; }
+        .sheet-card-value { font-size: 1.1rem; }
+        .stColumns { flex-wrap: wrap !important; }
+        .stColumn { flex: 1 1 45% !important; min-width: 80px; }
+    }
+    @media (max-width: 480px) {
+        .stColumn { flex: 1 1 100% !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------- GOOGLE SHEET CONNECTION ----------
-# 🛑 IMPORTANT: Aapki Google Sheet ka naam bilkul "CashDash" hona chahiye
 SHEET_NAME = "CashDash" 
 
 def get_gsheet_client():
@@ -213,7 +219,7 @@ def get_monthly_summary():
 
 # ---------- APP UI ----------
 st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
-st.markdown(f"<div style='color:#64748b; font-size:0.9rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
+st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
 
 # Navigation
 nav = st.radio(
@@ -251,7 +257,7 @@ if st.session_state.page == "🏠 Home":
     budget_left = total_budget - monthly_exp
     today_txns = df_tx[df_tx['Date'] == datetime.now().strftime('%Y-%m-%d')].shape[0] if not df_tx.empty else 0
 
-    # Row 1
+    # Row 1 - 5 columns, responsive
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💰 Total Balance</div><div class='sheet-card-value'>{format_currency(total_bal)}</div><div class='sheet-card-sub'>{'0%' if savings==0 else '📈 Positive' if savings>0 else '📉 Negative'}</div></div>", unsafe_allow_html=True)
     with col2: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🏦 Bank</div><div class='sheet-card-value'>{format_currency(bank_bal)}</div><div class='sheet-card-sub'>BOB + BOM</div></div>", unsafe_allow_html=True)
@@ -267,29 +273,7 @@ if st.session_state.page == "🏠 Home":
     with col9: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 Budget Left</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(budget_left)}</div><div class='sheet-card-sub'>from {format_currency(total_budget)}</div></div>", unsafe_allow_html=True)
     with col10: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>⚡ Today</div><div class='sheet-card-value'>{today_txns}</div><div class='sheet-card-sub'>{'txns' if today_txns>0 else 'No txns yet'}</div></div>", unsafe_allow_html=True)
 
-    # Row 3: Interactive Quick Actions
-    st.markdown("### ⚡ Quick Actions")
-    cola, colb, colc, cold = st.columns(4)
-    with cola:
-        if st.button("➕ Add Income", use_container_width=True):
-            st.session_state.page = "➕ Add"
-            st.session_state.add_type = "Income"
-            st.rerun()
-    with colb:
-        if st.button("➖ Add Expense", use_container_width=True):
-            st.session_state.page = "➕ Add"
-            st.session_state.add_type = "Expense"
-            st.rerun()
-    with colc:
-        if st.button("🔄 Transfer", use_container_width=True):
-            st.session_state.page = "🏦 Bank"
-            st.rerun()
-    with cold:
-        if st.button("📊 View Reports", use_container_width=True):
-            st.session_state.page = "⚡ More"
-            st.rerun()
-
-    # Row 4: Recent Transactions
+    # Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(10)
     if not recent.empty:
@@ -336,7 +320,7 @@ elif st.session_state.page == "➕ Add":
     st.markdown("### 🗑️ Delete a Transaction")
     if not st.session_state.transactions.empty:
         df_del = st.session_state.transactions.copy()
-        df_del['Display'] = df_del['Date'] + " | " + df_del['Description'] + " | ₹" + df_del['Amount'].astype(str)
+        df_del['Display'] = df_del['Date'].astype(str).fillna('') + " | " + df_del['Description'].astype(str).fillna('') + " | ₹" + df_del['Amount'].astype(str).fillna('0')
         to_delete = st.selectbox("Select transaction to delete", df_del['Display'])
         if st.button("🗑️ Delete Selected Transaction"):
             idx = df_del[df_del['Display'] == to_delete].index[0]
