@@ -158,6 +158,33 @@ elif nav == "➕ Add":
             category = st.selectbox("Category", ['Salary','Rent','Groceries','Vegetables','EMI','Mobile','Fuel','Entertainment','Shopping','Baby','Education','Others'])
             ttype = st.selectbox("Type", ["Income", "Expense"])
             payment_mode = st.selectbox("Payment Mode", ["UPI","BOB","BOM","Cash","PhonePe","GPay","Paytm"])
+        
+        if st.form_submit_button("✅ Add Transaction"):
+            try:
+                # 1. Local Data में Save करो (ताकि कम से कम काम तो हो)
+                new_row = [date.strftime('%Y-%m-%d'), description, category, amount, ttype, payment_mode, '✅']
+                new_df = pd.DataFrame({
+                    'Date': [date.strftime('%Y-%m-%d')],
+                    'Description': [description],
+                    'Category': [category],
+                    'Amount': [amount],
+                    'Type': [ttype],
+                    'Payment Mode': [payment_mode],
+                    'Status': ['✅']
+                })
+                st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+                
+                # 2. Google Sheet में Sync करने की कोशिश करो
+                append_to_worksheet('Transactions', new_row)
+                st.success("✅ Transaction Added & Synced to Google Sheet!")
+                
+            except Exception as e:
+                # अगर गूगल शीट फेल होती है, तो Error दिखाओ और बताओ कि Data Local में सेव है
+                st.error(f"❌ Google Sheet Sync Failed! Error: {e}")
+                st.warning("⚠️ Don't worry! Transaction is saved locally in your app. Please check your Secrets (JSON format) or Internet.")
+            
+            # 3. App को Refresh करो ताकि Transaction List में तुरंत दिखे
+            st.rerun()
         if st.form_submit_button("✅ Add Transaction"):
             new_row = [date.strftime('%Y-%m-%d'), description, category, amount, ttype, payment_mode, '✅']
             new_df = pd.DataFrame({
