@@ -11,7 +11,7 @@ from google.oauth2.service_account import Credentials
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- MOBILE-FIRST RESPONSIVE CSS ----------
+# ---------- MOBILE-OPTIMIZED CSS ----------
 st.markdown("""
 <style>
     .stApp { background-color: #f1f3f6; color: #1e293b; }
@@ -23,7 +23,7 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         border: 1px solid #e2e8f0;
         text-align: center;
-        min-width: 120px;
+        min-width: 100px;
     }
     .sheet-card-header {
         color: #64748b;
@@ -50,12 +50,12 @@ st.markdown("""
     }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;}
     
-    /* Mobile responsiveness: stack columns */
+    /* Mobile responsiveness: auto-stack columns */
     @media (max-width: 768px) {
-        .sheet-card { min-width: 80px; padding: 8px; }
+        .sheet-card { min-width: 70px; padding: 8px; }
         .sheet-card-value { font-size: 1.1rem; }
         .stColumns { flex-wrap: wrap !important; }
-        .stColumn { flex: 1 1 45% !important; min-width: 80px; }
+        .stColumn { flex: 1 1 45% !important; min-width: 70px; }
     }
     @media (max-width: 480px) {
         .stColumn { flex: 1 1 100% !important; }
@@ -63,13 +63,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- GOOGLE SHEET CONNECTION ----------
+# ---------- GOOGLE SHEET CONNECTION (CACHED FOR 1 HOUR) ----------
 SHEET_NAME = "CashDash" 
 
 def get_gsheet_client():
     try:
         secret_content = st.secrets["gcp_service_account"]
-        # Remove invalid control characters from JSON string
         secret_content = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', secret_content)
         if isinstance(secret_content, str):
             secret_content = json.loads(secret_content)
@@ -82,26 +81,38 @@ def get_gsheet_client():
         st.error(f"❌ Connection Error: {e}. Please check your Secrets JSON format and Sheet permissions.")
         return None
 
-def load_worksheet(ws_name):
+# ---------- SINGLE CACHED DATA LOAD (QUOTA FIX) ----------
+@st.cache_data(ttl=3600)  # 1 hour cache to avoid 429 quota errors
+def load_all_sheets():
     gc = get_gsheet_client()
     if gc is None:
-        st.warning("⚠️ Google Sheet not connected. Showing local data.")
-        return pd.DataFrame()
+        return {}
+    
+    data = {}
+    worksheet_names = ['Transactions', 'Budget', 'Accounts', 'Investments', 'EmiManager', 
+                       'Goals', 'BabyTracker', 'FuelTracker', 'Bills', 'Insurance', 'Assets']
+    
     try:
         sh = gc.open(SHEET_NAME)
-        try:
-            ws = sh.worksheet(ws_name)
-        except gspread.exceptions.WorksheetNotFound:
-            sh.add_worksheet(title=ws_name, rows=200, cols=20)
-            ws = sh.worksheet(ws_name)
-        records = ws.get_all_records()
-        return pd.DataFrame(records) if records else pd.DataFrame()
     except gspread.exceptions.SpreadsheetNotFound:
         st.error(f"❌ Google Sheet named '{SHEET_NAME}' not found in your Drive. Please create it with this exact name.")
-        return pd.DataFrame()
-    except Exception as e:
-        st.warning(f"⚠️ Error loading Sheet: {e}")
-        return pd.DataFrame()
+        return {}
+    
+    for ws_name in worksheet_names:
+        try:
+            ws = sh.worksheet(ws_name)
+            records = ws.get_all_records()
+            data[ws_name] = pd.DataFrame(records) if records else pd.DataFrame()
+        except gspread.exceptions.WorksheetNotFound:
+            # Create if not exists
+            sh.add_worksheet(title=ws_name, rows=200, cols=20)
+            ws = sh.worksheet(ws_name)
+            data[ws_name] = pd.DataFrame()
+        except Exception as e:
+            st.warning(f"⚠️ Could not load {ws_name}: {e}")
+            data[ws_name] = pd.DataFrame()
+    
+    return data
 
 def append_to_worksheet(ws_name, row_data):
     gc = get_gsheet_client()
@@ -116,8 +127,6 @@ def append_to_worksheet(ws_name, row_data):
             sh.add_worksheet(title=ws_name, rows=200, cols=20)
             ws = sh.worksheet(ws_name)
         ws.append_row(row_data)
-    except gspread.exceptions.SpreadsheetNotFound:
-        st.error(f"❌ Sheet '{SHEET_NAME}' not found. Data saved locally.")
     except Exception as e:
         st.error(f"❌ Error syncing: {e}")
 
@@ -132,74 +141,45 @@ def update_worksheet(ws_name, df):
     except Exception as e:
         st.warning(f"⚠️ Update failed: {e}")
 
-# ---------- SESSION STATE ----------
-if 'page' not in st.session_state:
-    st.session_state.page = "🏠 Home"
-if 'add_type' not in st.session_state:
-    st.session_state.add_type = "Income"
-
-if 'transactions' not in st.session_state:
-    st.session_state.transactions = load_worksheet('Transactions')
-    if st.session_state.transactions.empty:
-        st.session_state.transactions = pd.DataFrame(columns=['Date','Description','Category','Amount','Type','Payment Mode','Status'])
-
-if 'budget' not in st.session_state:
-    st.session_state.budget = load_worksheet('Budget')
-    if st.session_state.budget.empty:
-        st.session_state.budget = pd.DataFrame({
+# ---------- SESSION STATE (Fallback to cache) ----------
+def init_session_state():
+    # Load all data at once into session state
+    if 'data_loaded' not in st.session_state:
+        all_data = load_all_sheets()
+        st.session_state.data_loaded = True
+    else:
+        # Use cached data, but allow local updates
+        pass
+    
+    # Initialize dataframes if not present, using cached data as fallback
+    if 'transactions' not in st.session_state:
+        all_data = load_all_sheets()
+        st.session_state.transactions = all_data.get('Transactions', pd.DataFrame(columns=['Date','Description','Category','Amount','Type','Payment Mode','Status']))
+        st.session_state.budget = all_data.get('Budget', pd.DataFrame({
             'Category': ['Rent','Groceries','Vegetables','Mobile','EMI','Entertainment','Shopping','Baby','Education','Fuel','Investment'],
             'Current Month Budget': [3200,2500,2000,1000,1572,1000,1000,2000,500,1500,500],
             'Previous Month Budget': [3200,2500,2000,1000,1572,1000,1000,2000,500,1500,500],
             'Actual This Month': [3200,2500,2000,1000,0,1200,500,0,0,800,0]
-        })
-
-if 'accounts' not in st.session_state:
-    st.session_state.accounts = load_worksheet('Accounts')
-    if st.session_state.accounts.empty:
-        st.session_state.accounts = pd.DataFrame({
+        }))
+        st.session_state.accounts = all_data.get('Accounts', pd.DataFrame({
             'Account': ['BOB - UPI', 'BOM - UPI', 'PhonePe Wallet', 'Cash'],
             'Balance': [0,0,0,0]
-        })
+        }))
+        st.session_state.investments = all_data.get('Investments', pd.DataFrame(columns=['Name','Type','Amount','Frequency','Total Invested','Current Value']))
+        st.session_state.emi = all_data.get('EmiManager', pd.DataFrame(columns=['Loan Name','Total Loan','EMI Amount','Remaining','Months Left']))
+        st.session_state.goals = all_data.get('Goals', pd.DataFrame(columns=['Goal Name', 'Target', 'Saved']))
+        st.session_state.baby = all_data.get('BabyTracker', pd.DataFrame(columns=['Category', 'Budget', 'This Month']))
+        st.session_state.fuel = all_data.get('FuelTracker', pd.DataFrame(columns=['Date', 'Distance (km)', 'Fuel (L)', 'Cost (₹)']))
+        st.session_state.bills = all_data.get('Bills', pd.DataFrame(columns=['Bill Name', 'Amount', 'Due Date', 'Status']))
+        st.session_state.insurance = all_data.get('Insurance', pd.DataFrame(columns=['Type', 'Premium', 'Renewal Date']))
+        st.session_state.assets = all_data.get('Assets', pd.DataFrame(columns=['Asset Name', 'Value (₹)', 'Warranty']))
 
-if 'investments' not in st.session_state:
-    st.session_state.investments = load_worksheet('Investments')
-    if st.session_state.investments.empty:
-        st.session_state.investments = pd.DataFrame(columns=['Name','Type','Amount','Frequency','Total Invested','Current Value'])
+init_session_state()
 
-if 'emi' not in st.session_state:
-    st.session_state.emi = load_worksheet('EmiManager')
-    if st.session_state.emi.empty:
-        st.session_state.emi = pd.DataFrame(columns=['Loan Name','Total Loan','EMI Amount','Remaining','Months Left'])
-
-if 'goals' not in st.session_state:
-    st.session_state.goals = load_worksheet('Goals')
-    if st.session_state.goals.empty:
-        st.session_state.goals = pd.DataFrame(columns=['Goal Name', 'Target', 'Saved'])
-
-if 'baby' not in st.session_state:
-    st.session_state.baby = load_worksheet('BabyTracker')
-    if st.session_state.baby.empty:
-        st.session_state.baby = pd.DataFrame(columns=['Category', 'Budget', 'This Month'])
-
-if 'fuel' not in st.session_state:
-    st.session_state.fuel = load_worksheet('FuelTracker')
-    if st.session_state.fuel.empty:
-        st.session_state.fuel = pd.DataFrame(columns=['Date', 'Distance (km)', 'Fuel (L)', 'Cost (₹)'])
-
-if 'bills' not in st.session_state:
-    st.session_state.bills = load_worksheet('Bills')
-    if st.session_state.bills.empty:
-        st.session_state.bills = pd.DataFrame(columns=['Bill Name', 'Amount', 'Due Date', 'Status'])
-
-if 'insurance' not in st.session_state:
-    st.session_state.insurance = load_worksheet('Insurance')
-    if st.session_state.insurance.empty:
-        st.session_state.insurance = pd.DataFrame(columns=['Type', 'Premium', 'Renewal Date'])
-
-if 'assets' not in st.session_state:
-    st.session_state.assets = load_worksheet('Assets')
-    if st.session_state.assets.empty:
-        st.session_state.assets = pd.DataFrame(columns=['Asset Name', 'Value (₹)', 'Warranty'])
+if 'page' not in st.session_state:
+    st.session_state.page = "🏠 Home"
+if 'add_type' not in st.session_state:
+    st.session_state.add_type = "Income"
 
 # ---------- HELPER FUNCTIONS ----------
 def format_currency(amount):
@@ -236,7 +216,6 @@ if st.session_state.page == "🏠 Home":
     current_month = datetime.now().strftime('%B')
     df_tx = st.session_state.transactions
     
-    # Calculate Metrics
     total_bal = total_balance()
     bank_bal = st.session_state.accounts.loc[st.session_state.accounts['Account'].isin(['BOB - UPI', 'BOM - UPI']), 'Balance'].sum()
     upi_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='PhonePe Wallet', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
@@ -257,7 +236,6 @@ if st.session_state.page == "🏠 Home":
     budget_left = total_budget - monthly_exp
     today_txns = df_tx[df_tx['Date'] == datetime.now().strftime('%Y-%m-%d')].shape[0] if not df_tx.empty else 0
 
-    # Row 1 - 5 columns, responsive
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💰 Total Balance</div><div class='sheet-card-value'>{format_currency(total_bal)}</div><div class='sheet-card-sub'>{'0%' if savings==0 else '📈 Positive' if savings>0 else '📉 Negative'}</div></div>", unsafe_allow_html=True)
     with col2: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🏦 Bank</div><div class='sheet-card-value'>{format_currency(bank_bal)}</div><div class='sheet-card-sub'>BOB + BOM</div></div>", unsafe_allow_html=True)
@@ -265,7 +243,6 @@ if st.session_state.page == "🏠 Home":
     with col4: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 EMI Due</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(emi_due)}</div><div class='sheet-card-sub'>{len(st.session_state.emi)} Active Loans</div></div>", unsafe_allow_html=True)
     with col5: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📊 Net Worth</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(net_worth)}</div><div class='sheet-card-sub'>Assets - Liabilities</div></div>", unsafe_allow_html=True)
 
-    # Row 2
     col6, col7, col8, col9, col10 = st.columns(5)
     with col6: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Income</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col7: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Expenses</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(monthly_exp)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
@@ -273,7 +250,6 @@ if st.session_state.page == "🏠 Home":
     with col9: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 Budget Left</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(budget_left)}</div><div class='sheet-card-sub'>from {format_currency(total_budget)}</div></div>", unsafe_allow_html=True)
     with col10: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>⚡ Today</div><div class='sheet-card-value'>{today_txns}</div><div class='sheet-card-sub'>{'txns' if today_txns>0 else 'No txns yet'}</div></div>", unsafe_allow_html=True)
 
-    # Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(10)
     if not recent.empty:
@@ -309,6 +285,7 @@ elif st.session_state.page == "➕ Add":
                 st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                 append_to_worksheet('Transactions', new_row)
                 
+                # Clear cache so new data appears, but keep API calls low
                 st.cache_data.clear()
                 st.success("✅ Transaction Saved Successfully!")
                 st.rerun()
