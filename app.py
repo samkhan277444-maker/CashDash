@@ -91,7 +91,7 @@ def load_all_sheets():
     
     data = {}
     worksheet_names = ['Transactions', 'Budget', 'Accounts', 'Investments', 'EmiManager', 
-                       'Goals', 'BabyTracker', 'FuelTracker', 'Bills', 'Insurance', 'Assets']
+                       'Goals', 'BabyTracker', 'FuelTracker', 'Bills', 'Insurance', 'Assets', 'Settings']
     
     try:
         sh = gc.open(SHEET_NAME)
@@ -137,6 +137,29 @@ def update_worksheet(ws_name, df):
     except Exception as e:
         st.warning(f"⚠️ Update failed: {e}")
 
+# 🛡️ NEW: Update Settings (Master Budget)
+def update_settings(key, value):
+    gc = get_gsheet_client()
+    if gc is None: return
+    try:
+        sh = gc.open(SHEET_NAME)
+        try:
+            ws = sh.worksheet('Settings')
+        except:
+            sh.add_worksheet(title='Settings', rows=10, cols=2)
+            ws = sh.worksheet('Settings')
+            ws.update([['Key', 'Value']])
+        
+        data = ws.get_all_records()
+        df = pd.DataFrame(data) if data else pd.DataFrame(columns=['Key','Value'])
+        if key in df['Key'].values:
+            idx = df[df['Key']==key].index[0]
+            ws.update_cell(idx+2, 2, value)  # +2 because 1-based index and header row
+        else:
+            ws.append_row([key, value])
+    except Exception as e:
+        st.warning(f"Could not update settings: {e}")
+
 # ---------- SESSION STATE ----------
 def init_session_state():
     all_data = load_all_sheets()
@@ -171,15 +194,72 @@ def init_session_state():
     else:
         st.session_state.accounts = loaded
 
-    # 4-11. (Remaining modules as before)
-    st.session_state.investments = all_data.get('Investments', pd.DataFrame(columns=['Name','Type','Amount','Frequency','Total Invested','Current Value']))
-    st.session_state.emi = all_data.get('EmiManager', pd.DataFrame(columns=['Loan Name','Total Loan','EMI Amount','Remaining','Months Left']))
-    st.session_state.goals = all_data.get('Goals', pd.DataFrame(columns=['Goal Name', 'Target', 'Saved']))
-    st.session_state.baby = all_data.get('BabyTracker', pd.DataFrame(columns=['Category', 'Budget', 'This Month']))
-    st.session_state.fuel = all_data.get('FuelTracker', pd.DataFrame(columns=['Date', 'Distance (km)', 'Fuel (L)', 'Cost (₹)']))
-    st.session_state.bills = all_data.get('Bills', pd.DataFrame(columns=['Bill Name', 'Amount', 'Due Date', 'Status']))
-    st.session_state.insurance = all_data.get('Insurance', pd.DataFrame(columns=['Type', 'Premium', 'Renewal Date']))
-    st.session_state.assets = all_data.get('Assets', pd.DataFrame(columns=['Asset Name', 'Value (₹)', 'Warranty']))
+    # 4. Investments
+    loaded = all_data.get('Investments', pd.DataFrame())
+    req_inv_cols = ['Name','Type','Amount','Frequency','Total Invested','Current Value']
+    if loaded.empty or not all(c in loaded.columns for c in req_inv_cols):
+        st.session_state.investments = pd.DataFrame(columns=req_inv_cols)
+    else:
+        st.session_state.investments = loaded
+
+    # 5. EMI
+    loaded = all_data.get('EmiManager', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Loan Name','Total Loan','EMI Amount','Remaining','Months Left']):
+        st.session_state.emi = pd.DataFrame(columns=['Loan Name','Total Loan','EMI Amount','Remaining','Months Left'])
+    else:
+        st.session_state.emi = loaded
+
+    # 6. Goals
+    loaded = all_data.get('Goals', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Goal Name','Target','Saved']):
+        st.session_state.goals = pd.DataFrame(columns=['Goal Name', 'Target', 'Saved'])
+    else:
+        st.session_state.goals = loaded
+
+    # 7. Baby
+    loaded = all_data.get('BabyTracker', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Category','Budget','This Month']):
+        st.session_state.baby = pd.DataFrame(columns=['Category', 'Budget', 'This Month'])
+    else:
+        st.session_state.baby = loaded
+
+    # 8. Fuel
+    loaded = all_data.get('FuelTracker', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Date','Distance (km)','Fuel (L)','Cost (₹)']):
+        st.session_state.fuel = pd.DataFrame(columns=['Date', 'Distance (km)', 'Fuel (L)', 'Cost (₹)'])
+    else:
+        st.session_state.fuel = loaded
+
+    # 9. Bills
+    loaded = all_data.get('Bills', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Bill Name','Amount','Due Date','Status']):
+        st.session_state.bills = pd.DataFrame(columns=['Bill Name', 'Amount', 'Due Date', 'Status'])
+    else:
+        st.session_state.bills = loaded
+
+    # 10. Insurance
+    loaded = all_data.get('Insurance', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Type','Premium','Renewal Date']):
+        st.session_state.insurance = pd.DataFrame(columns=['Type', 'Premium', 'Renewal Date'])
+    else:
+        st.session_state.insurance = loaded
+
+    # 11. Assets
+    loaded = all_data.get('Assets', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Asset Name','Value (₹)','Warranty']):
+        st.session_state.assets = pd.DataFrame(columns=['Asset Name', 'Value (₹)', 'Warranty'])
+    else:
+        st.session_state.assets = loaded
+
+    # 12. Settings (Master Budget)
+    loaded = all_data.get('Settings', pd.DataFrame())
+    if loaded.empty or 'master_budget' not in loaded['Key'].values:
+        st.session_state.master_budget = 0.0
+    else:
+        try:
+            st.session_state.master_budget = float(loaded[loaded['Key']=='master_budget']['Value'].values[0])
+        except:
+            st.session_state.master_budget = 0.0
 
 if 'initialized' not in st.session_state:
     init_session_state()
@@ -225,7 +305,9 @@ if st.session_state.page == "🏠 Home":
     upi_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='PhonePe Wallet', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     cash_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='Cash', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     emi_due = st.session_state.emi['EMI Amount'].sum() if not st.session_state.emi.empty else 0
-    net_worth = total_bal + st.session_state.investments['Current Value'].sum() - emi_due
+    
+    inv_current_val = st.session_state.investments['Current Value'].sum() if 'Current Value' in st.session_state.investments.columns else 0
+    net_worth = total_bal + inv_current_val - emi_due
     
     monthly_inc = 0
     monthly_exp = 0
@@ -236,8 +318,8 @@ if st.session_state.page == "🏠 Home":
         monthly_exp = df_month[df_month['Type']=='Expense']['Amount'].sum()
     
     savings = monthly_inc - monthly_exp
-    total_budget = st.session_state.budget['Current Month Budget'].sum()
-    budget_left = total_budget - monthly_exp
+    total_budget_cats = st.session_state.budget['Current Month Budget'].sum()
+    budget_left = total_budget_cats - monthly_exp
     today_txns = df_tx[df_tx['Date'] == datetime.now().strftime('%Y-%m-%d')].shape[0] if not df_tx.empty else 0
 
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -251,7 +333,7 @@ if st.session_state.page == "🏠 Home":
     with col6: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Income</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col7: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Expenses</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(monthly_exp)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col8: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💎 Savings</div><div class='sheet-card-value' style='color:#f59e0b;'>{format_currency(savings)}</div><div class='sheet-card-sub'>{ f'{(savings/monthly_inc)*100:.0f}%' if monthly_inc>0 else '0%' }</div></div>", unsafe_allow_html=True)
-    with col9: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 Budget Left</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(budget_left)}</div><div class='sheet-card-sub'>from {format_currency(total_budget)}</div></div>", unsafe_allow_html=True)
+    with col9: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 Budget Left</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(budget_left)}</div><div class='sheet-card-sub'>from {format_currency(total_budget_cats)}</div></div>", unsafe_allow_html=True)
     with col10: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>⚡ Today</div><div class='sheet-card-value'>{today_txns}</div><div class='sheet-card-sub'>{'txns' if today_txns>0 else 'No txns yet'}</div></div>", unsafe_allow_html=True)
 
     st.markdown("### 📋 Recent Transactions")
@@ -309,40 +391,48 @@ elif st.session_state.page == "➕ Add":
     else:
         st.info("No transactions available to delete.")
 
-# ===================== BUDGET (CLEAN TOTAL SECTION) =====================
+# ===================== BUDGET (WITH MASTER BUDGET CAP) =====================
 elif st.session_state.page == "🎯 Budget":
     st.subheader("🎯 Budget Planner (Monthly)")
     
     df = st.session_state.budget
+    master_budget = st.session_state.master_budget
     
-    # Calculate Totals
+    # Calculate Category Totals
     total_budget_val = df['Current Month Budget'].sum()
     total_spent_val = df['Actual This Month'].sum()
     total_prev_val = df['Previous Month Budget'].sum()
-    remaining_val = total_budget_val - total_spent_val
     
-    # ✅ BUDGET SUMMARY CARDS (सिर्फ 4 जरूरी कार्ड)
+    # Determine effective cap (Master if > 0, else Category Sum)
+    effective_cap = master_budget if master_budget > 0 else total_budget_val
+    remaining_val = effective_cap - total_spent_val
+    
+    # ✅ BUDGET SUMMARY CARDS (With Master Budget)
     st.markdown("### 📊 Monthly Overview")
     col_t1, col_t2, col_t3, col_t4 = st.columns(4)
     
     with col_t1:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💰 Total Budget</div><div class='sheet-card-value'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
-    
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💰 Category Budget</div><div class='sheet-card-value'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
     with col_t2:
-        # 🔴 आपने जो मांगा: इस महीने कितना खर्च हुआ (Total Spent)
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Total Spent (This Month)</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(total_spent_val)}</div></div>", unsafe_allow_html=True)
-    
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 Master Cap (Target)</div><div class='sheet-card-value'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div></div>", unsafe_allow_html=True)
     with col_t3:
-        # 🟢 बचा हुआ बजट
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>✅ Remaining</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(remaining_val)}</div></div>", unsafe_allow_html=True)
-    
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Total Spent</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(total_spent_val)}</div></div>", unsafe_allow_html=True)
     with col_t4:
-        # 📊 ओवरल स्टेटस
         status_color = "#10b981" if remaining_val >= 0 else "#ef4444"
         status_text = "✅ On Track" if remaining_val >= 0 else "⚠️ Over Budget"
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📊 Status</div><div class='sheet-card-value' style='color:{status_color};'>{status_text}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>✅ Remaining</div><div class='sheet-card-value' style='color:{status_color};'>{format_currency(remaining_val)}</div><div class='sheet-card-sub'>{status_text}</div></div>", unsafe_allow_html=True)
 
-    # ✅ CATEGORY TABLE (With TOTAL Row at the bottom)
+    # Input for Master Budget
+    with st.expander("✏️ Set Overall Monthly Budget Cap"):
+        new_master = st.number_input("Enter your ideal monthly budget cap (₹)", value=master_budget, step=500.0)
+        if st.button("Save Master Budget Cap"):
+            st.session_state.master_budget = new_master
+            update_settings('master_budget', new_master)
+            st.cache_data.clear()
+            st.success(f"Master budget cap set to {format_currency(new_master)}!")
+            st.rerun()
+
+    # ✅ CATEGORY TABLE (With TOTAL Row)
     st.markdown("---")
     st.markdown("### 📋 Category Breakdown")
     
@@ -350,7 +440,7 @@ elif st.session_state.page == "🎯 Budget":
     df_display['Diff'] = df_display['Current Month Budget'] - df_display['Previous Month Budget']
     df_display['Progress'] = (df_display['Actual This Month'] / df_display['Current Month Budget'] * 100).fillna(0).round(1)
     
-    # Add the TOTAL row at the bottom of the table
+    # Add the TOTAL row
     total_progress = (total_spent_val / total_budget_val * 100) if total_budget_val > 0 else 0
     total_row = pd.DataFrame({
         'Category': ['💰 TOTAL'],
