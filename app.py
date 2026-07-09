@@ -18,27 +18,27 @@ st.markdown("""
     .sheet-card {
         background: #ffffff;
         border-radius: 8px;
-        padding: 10px 12px;
-        margin-bottom: 10px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         border: 1px solid #e2e8f0;
         text-align: center;
-        min-width: 100px;
+        min-width: 80px;
     }
     .sheet-card-header {
         color: #64748b;
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: 600;
         margin-bottom: 2px;
         text-transform: uppercase;
     }
     .sheet-card-value {
-        font-size: 1.4rem;
+        font-size: 1.2rem;
         font-weight: 700;
         color: #0f172a;
     }
     .sheet-card-sub {
-        font-size: 0.6rem;
+        font-size: 0.55rem;
         color: #94a3b8;
         margin-top: 2px;
     }
@@ -47,15 +47,16 @@ st.markdown("""
         border-radius: 6px;
         font-weight: 600;
         border: none;
+        font-size: 0.85rem;
     }
+    .stDataFrame { font-size: 0.8rem; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;}
     
-    /* Mobile responsiveness: auto-stack columns */
     @media (max-width: 768px) {
-        .sheet-card { min-width: 70px; padding: 8px; }
-        .sheet-card-value { font-size: 1.1rem; }
+        .sheet-card { min-width: 60px; padding: 6px; }
+        .sheet-card-value { font-size: 1rem; }
         .stColumns { flex-wrap: wrap !important; }
-        .stColumn { flex: 1 1 45% !important; min-width: 70px; }
+        .stColumn { flex: 1 1 45% !important; min-width: 60px; }
     }
     @media (max-width: 480px) {
         .stColumn { flex: 1 1 100% !important; }
@@ -63,7 +64,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- GOOGLE SHEET CONNECTION (CACHED FOR 1 HOUR) ----------
+# ---------- GOOGLE SHEET CONNECTION ----------
 SHEET_NAME = "CashDash" 
 
 def get_gsheet_client():
@@ -81,8 +82,8 @@ def get_gsheet_client():
         st.error(f"❌ Connection Error: {e}")
         return None
 
-# ---------- SINGLE CACHED DATA LOAD (QUOTA FIX) ----------
-@st.cache_data(ttl=3600)  # 1 hour cache to avoid 429 quota errors
+# ---------- CACHED DATA LOAD (1 HOUR TTL) ----------
+@st.cache_data(ttl=3600)
 def load_all_sheets():
     gc = get_gsheet_client()
     if gc is None:
@@ -131,11 +132,13 @@ def update_worksheet(ws_name, df):
         sh = gc.open(SHEET_NAME)
         ws = sh.worksheet(ws_name)
         ws.clear()
-        ws.update([df.columns.values.tolist()] + df.values.tolist())
+        # Replace NaN with empty strings to avoid JSON errors
+        df_clean = df.fillna('')
+        ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
     except Exception as e:
         st.warning(f"⚠️ Update failed: {e}")
 
-# ---------- SESSION STATE (100% ERROR-PROOF) ----------
+# ---------- SESSION STATE (Data is loaded once per session) ----------
 def init_session_state():
     all_data = load_all_sheets()
     
@@ -159,7 +162,7 @@ def init_session_state():
     else:
         st.session_state.budget = loaded
 
-    # 3. Accounts (✅ FIXES YOUR KeyError)
+    # 3. Accounts
     loaded = all_data.get('Accounts', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Account','Balance']):
         st.session_state.accounts = pd.DataFrame({
@@ -225,8 +228,10 @@ def init_session_state():
     else:
         st.session_state.assets = loaded
 
-# Run init
-init_session_state()
+# Initialize once
+if 'initialized' not in st.session_state:
+    init_session_state()
+    st.session_state.initialized = True
 
 if 'page' not in st.session_state:
     st.session_state.page = "🏠 Home"
@@ -238,7 +243,6 @@ def format_currency(amount):
     return f"₹ {amount:,.0f}"
 
 def total_balance():
-    # This line will NEVER error now because 'Balance' column is guaranteed to exist
     return st.session_state.accounts['Balance'].sum()
 
 def get_monthly_summary():
@@ -249,6 +253,12 @@ def get_monthly_summary():
     inc = df[df['Type']=='Income'].groupby('Month')['Amount'].sum().reset_index()
     exp = df[df['Type']=='Expense'].groupby('Month')['Amount'].sum().reset_index()
     return inc, exp
+
+def refresh_data():
+    """Clears cache and reloads data from sheet"""
+    st.cache_data.clear()
+    init_session_state()
+    st.rerun()
 
 # ---------- APP UI ----------
 st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
@@ -304,7 +314,7 @@ if st.session_state.page == "🏠 Home":
     with col10: st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>⚡ Today</div><div class='sheet-card-value'>{today_txns}</div><div class='sheet-card-sub'>{'txns' if today_txns>0 else 'No txns yet'}</div></div>", unsafe_allow_html=True)
 
     st.markdown("### 📋 Recent Transactions")
-    recent = st.session_state.transactions.sort_values('Date', ascending=False).head(10)
+    recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)  # Only top 5 for speed
     if not recent.empty:
         st.table(recent[['Date','Description','Category','Amount','Type']].style.format({'Amount': '₹ {:.0f}'}).hide(axis=0))
     else:
@@ -338,6 +348,7 @@ elif st.session_state.page == "➕ Add":
                 st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                 append_to_worksheet('Transactions', new_row)
                 
+                # Clear cache so sheet gets updated on next load (but we just append, so data is already in session)
                 st.cache_data.clear()
                 st.success("✅ Transaction Saved Successfully!")
                 st.rerun()
@@ -361,7 +372,7 @@ elif st.session_state.page == "➕ Add":
     else:
         st.info("No transactions available to delete.")
 
-# ===================== BUDGET =====================
+# ===================== BUDGET (with Category Delete) =====================
 elif st.session_state.page == "🎯 Budget":
     st.subheader("🎯 Budget Planner (Monthly)")
     
@@ -373,9 +384,26 @@ elif st.session_state.page == "🎯 Budget":
         'Actual This Month': '₹ {:.0f}', 'Diff': '₹ {:.0f}', 'Progress': '{:.1f}%'
     }), use_container_width=True, hide_index=True)
 
-    with st.expander("✏️ Add / Edit Budget Category"):
+    # ----- Add / Edit / Delete Category -----
+    with st.expander("✏️ Add / Edit / Delete Budget Category"):
+        # Delete section
+        st.markdown("#### 🗑️ Delete a Category")
+        if not df.empty:
+            del_cat = st.selectbox("Select category to delete", df['Category'])
+            if st.button("🗑️ Delete Selected Category"):
+                idx = df[df['Category'] == del_cat].index[0]
+                st.session_state.budget = df.drop(idx).reset_index(drop=True)
+                update_worksheet('Budget', st.session_state.budget)
+                st.cache_data.clear()
+                st.success(f"Category '{del_cat}' deleted!")
+                st.rerun()
+        else:
+            st.info("No categories to delete.")
+
+        st.markdown("---")
+        # Add / Edit section
         new_cat = st.text_input("New Category Name (Leave blank to edit existing)")
-        sel_cat = st.selectbox("Or select existing", df['Category'].tolist() + ["New"])
+        sel_cat = st.selectbox("Or select existing to edit", df['Category'].tolist() + ["New"])
         
         curr = st.number_input("Current Month Budget ₹", min_value=0.0, step=100.0)
         prev = st.number_input("Previous Month Budget ₹", min_value=0.0, step=100.0)
@@ -602,14 +630,14 @@ elif st.session_state.page == "⚡ More":
             merged = pd.merge(inc, exp, on='Month', how='outer').fillna(0)
             merged.columns = ['Month','Income','Expense']
             fig1 = px.bar(merged, x='Month', y=['Income','Expense'], barmode='group', color_discrete_map={'Income':'#10b981', 'Expense':'#ef4444'})
-            fig1.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6')
+            fig1.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
             st.plotly_chart(fig1, use_container_width=True)
             
             # 2. Month over Month Progress (Expense)
             exp_monthly = exp.copy()
             if len(exp_monthly) >= 2:
                 fig2 = px.line(exp_monthly, x='Month', y='Amount', markers=True, title="📉 Month-Over-Month Expense Progress")
-                fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6')
+                fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig2, use_container_width=True)
             else:
                 st.info("Need at least 2 months of expense data for progress chart.")
@@ -618,7 +646,7 @@ elif st.session_state.page == "⚡ More":
             df_exp = df[df['Type']=='Expense'].groupby('Category')['Amount'].sum().reset_index()
             if not df_exp.empty:
                 fig3 = px.pie(df_exp, names='Category', values='Amount', title="🧾 Expense Breakdown", hole=0.3)
-                fig3.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6')
+                fig3.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig3, use_container_width=True)
         else:
             st.info("Add some transactions to see detailed reports.")
