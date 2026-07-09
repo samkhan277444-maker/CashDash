@@ -175,10 +175,10 @@ def init_session_state():
     loaded = all_data.get('Budget', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Category','Current Month Budget','Previous Month Budget','Actual This Month']):
         st.session_state.budget = pd.DataFrame({
-            'Category': ['Rent','Groceries','Vegetables','Mobile','EMI','Entertainment','Shopping','Education','Fuel','Investment'],
-            'Current Month Budget': [3200,2500,2000,1000,1572,1000,1000,500,1500,500],
-            'Previous Month Budget': [3200,2500,2000,1000,1572,1000,1000,500,1500,500],
-            'Actual This Month': [3200,2500,2000,1000,0,1200,500,0,0,800]
+            'Category': ['Rent','Groceries','Vegetables','Mobile','EMI','Entertainment','Shopping','Education','Fuel','Investment','BC'],
+            'Current Month Budget': [3200,2500,2000,1000,1572,1000,1000,500,1500,500,1000],
+            'Previous Month Budget': [3200,2500,2000,1000,1572,1000,1000,500,1500,500,1000],
+            'Actual This Month': [3200,2500,2000,1000,0,1200,500,0,0,800,0]
         })
     else:
         st.session_state.budget = loaded
@@ -187,7 +187,7 @@ def init_session_state():
     loaded = all_data.get('Accounts', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Account','Balance']):
         st.session_state.accounts = pd.DataFrame({
-            'Account': ['BOB Bank', 'BOM Bank', 'UPI Wallet', 'Cash'],
+            'Account': ['BOB Bank', 'BOM Bank', 'PhonePe Wallet', 'Cash'],
             'Balance': [0,0,0,0]
         })
     else:
@@ -222,13 +222,11 @@ def init_session_state():
     else:
         st.session_state.fuel = loaded
 
-    # 8. Settings (Master Budget & Initial Investment)
+    # 8. Settings (Master Budget only)
     loaded = all_data.get('Settings', pd.DataFrame())
     if loaded.empty:
         st.session_state.master_budget = 0.0
-        st.session_state.initial_investments = {}
     else:
-        # Master Budget
         if 'master_budget' in loaded['Key'].values:
             try:
                 st.session_state.master_budget = float(loaded[loaded['Key']=='master_budget']['Value'].values[0])
@@ -236,16 +234,6 @@ def init_session_state():
                 st.session_state.master_budget = 0.0
         else:
             st.session_state.master_budget = 0.0
-        
-        # Initial Investments (store as JSON string in a setting)
-        if 'initial_investments' in loaded['Key'].values:
-            try:
-                import json as json_lib
-                st.session_state.initial_investments = json_lib.loads(loaded[loaded['Key']=='initial_investments']['Value'].values[0])
-            except:
-                st.session_state.initial_investments = {}
-        else:
-            st.session_state.initial_investments = {}
 
 if 'initialized' not in st.session_state:
     init_session_state()
@@ -289,7 +277,7 @@ if st.session_state.page == "🏠 Home":
     # Account balances
     bob_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='BOB Bank', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     bom_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='BOM Bank', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
-    upi_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='UPI Wallet', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
+    upi_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='PhonePe Wallet', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     cash_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='Cash', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     
     monthly_inc = 0
@@ -303,9 +291,21 @@ if st.session_state.page == "🏠 Home":
     savings = monthly_inc - monthly_exp
     total_budget_val = st.session_state.budget['Current Month Budget'].sum()
     
-    # Investment stats
-    total_invested = st.session_state.investments['Total Invested'].sum() if 'Total Invested' in st.session_state.investments.columns else 0
-    current_value = st.session_state.investments['Current Value'].sum() if 'Current Value' in st.session_state.investments.columns else 0
+    # Investment stats (SIP + Gold only)
+    inv_df = st.session_state.investments
+    sip_inv = inv_df[inv_df['Name']=='SIP']['Total Invested'].sum() if 'Name' in inv_df.columns and 'SIP' in inv_df['Name'].values else 0
+    gold_inv = inv_df[inv_df['Name']=='Gold']['Total Invested'].sum() if 'Name' in inv_df.columns and 'Gold' in inv_df['Name'].values else 0
+    total_invested = sip_inv + gold_inv
+    sip_curr = inv_df[inv_df['Name']=='SIP']['Current Value'].sum() if 'Name' in inv_df.columns and 'SIP' in inv_df['Name'].values else 0
+    gold_curr = inv_df[inv_df['Name']=='Gold']['Current Value'].sum() if 'Name' in inv_df.columns and 'Gold' in inv_df['Name'].values else 0
+    current_value = sip_curr + gold_curr
+    
+    # EMI stats
+    total_emi_remaining = st.session_state.emi['Remaining'].sum() if not st.session_state.emi.empty else 0
+    total_emi_due = st.session_state.emi['EMI Amount'].sum() if not st.session_state.emi.empty else 0
+    
+    # BC stats (from transactions with Type='BC')
+    bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
 
     # Row 1: Account balances (4 cards)
     col1, col2, col3, col4 = st.columns(4)
@@ -314,20 +314,31 @@ if st.session_state.page == "🏠 Home":
     with col2:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🏦 BOM Bank</div><div class='sheet-card-value'>{format_currency(bom_bal)}</div></div>", unsafe_allow_html=True)
     with col3:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📱 UPI Wallet</div><div class='sheet-card-value'>{format_currency(upi_bal)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📱 PhonePe Wallet</div><div class='sheet-card-value'>{format_currency(upi_bal)}</div></div>", unsafe_allow_html=True)
     with col4:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💵 Cash</div><div class='sheet-card-value'>{format_currency(cash_bal)}</div></div>", unsafe_allow_html=True)
 
-    # Row 2: Savings, This Month Budget, Investment
-    col5, col6, col7 = st.columns(3)
+    # Row 2: Income, Expense, Savings, This Month Budget
+    col5, col6, col7, col8 = st.columns(4)
     with col5:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💎 Savings (This Month)</div><div class='sheet-card-value' style='color:#f59e0b;'>{format_currency(savings)}</div><div class='sheet-card-sub'>{ f'{(savings/monthly_inc)*100:.0f}%' if monthly_inc>0 else '0%' }</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Income</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col6:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 This Month Budget</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Total Expense</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(monthly_exp)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col7:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Invested</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(total_invested)}</div><div class='sheet-card-sub'>Current Value: {format_currency(current_value)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💎 Savings</div><div class='sheet-card-value' style='color:#f59e0b;'>{format_currency(savings)}</div><div class='sheet-card-sub'>{ f'{(savings/monthly_inc)*100:.0f}%' if monthly_inc>0 else '0%' }</div></div>", unsafe_allow_html=True)
+    with col8:
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 This Month Budget</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
 
-    # Row 3: Recent Transactions
+    # Row 3: Investment, EMI, BC
+    col9, col10, col11 = st.columns(3)
+    with col9:
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Invested (SIP+Gold)</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(total_invested)}</div><div class='sheet-card-sub'>Current Value: {format_currency(current_value)}</div></div>", unsafe_allow_html=True)
+    with col10:
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🏦 EMI Summary</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(total_emi_due)}</div><div class='sheet-card-sub'>Remaining: {format_currency(total_emi_remaining)}</div></div>", unsafe_allow_html=True)
+    with col11:
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_total)}</div><div class='sheet-card-sub'>All time</div></div>", unsafe_allow_html=True)
+
+    # Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
     if not recent.empty:
@@ -335,15 +346,16 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No transactions yet.")
 
-# ===================== ADD TRANSACTION (Integrated Fuel, EMI, Investment) =====================
+# ===================== ADD TRANSACTION (Integrated all) =====================
 elif st.session_state.page == "➕ Add":
     st.subheader("➕ Add Transaction")
     
     existing_cats = st.session_state.budget['Category'].tolist()
-    all_cats = ['Transfer'] + existing_cats + ['Others']
+    # Add categories: SIP, Gold, EMI, Fuel, Udhar (Loan), BC, etc. (but we keep them in category)
+    all_cats = ['Transfer'] + existing_cats + ['SIP', 'Gold', 'EMI', 'Fuel', 'Udhar', 'Others']
     
     default_type = st.session_state.get('add_type', 'Income')
-    type_options = ["Income", "Expense", "Investment", "Transfer"]
+    type_options = ["Income", "Expense", "Investment", "Transfer", "BC"]
     
     with st.form("add_form"):
         col1, col2 = st.columns(2)
@@ -354,7 +366,7 @@ elif st.session_state.page == "➕ Add":
         with col2:
             ttype = st.selectbox("Type", type_options, index=type_options.index(default_type) if default_type in type_options else 0)
             category = st.selectbox("Category", all_cats)
-            payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "UPI Wallet", "Cash"])
+            payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
         
         # Transfer fields
         from_acc = None
@@ -378,16 +390,21 @@ elif st.session_state.page == "➕ Add":
             else:
                 st.info("No EMI loans added yet. Go to More > EMI to add a loan.")
         
-        # Investment fields
-        is_investment = (ttype == "Investment")
+        # Investment fields (SIP/Gold/Other)
+        is_investment = (ttype == "Investment") or (category in ['SIP', 'Gold'])
         inv_name = None
         if is_investment:
             existing_inv = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
-            inv_options = ['New Investment'] + existing_inv
-            inv_name = st.selectbox("Select Investment", inv_options)
-            if inv_name == 'New Investment':
-                inv_name = st.text_input("Enter new investment name")
+            # If category is SIP/Gold, auto-select that name
+            if category in ['SIP', 'Gold']:
+                inv_name = category
             else:
+                inv_options = ['New Investment'] + existing_inv
+                inv_name = st.selectbox("Select Investment", inv_options)
+                if inv_name == 'New Investment':
+                    inv_name = st.text_input("Enter new investment name")
+            # Show current total if exists
+            if inv_name in existing_inv:
                 inv_row = st.session_state.investments[st.session_state.investments['Name'] == inv_name]
                 if not inv_row.empty:
                     st.info(f"Current Total Invested: {format_currency(inv_row.iloc[0]['Total Invested'])}")
@@ -438,7 +455,7 @@ elif st.session_state.page == "➕ Add":
                             'Name': [inv_name],
                             'Type': ['Other'],
                             'Amount': [0],
-                            'Frequency': ['Monthly'],
+                            'Frequency': ['Daily'],
                             'Total Invested': [amount],
                             'Current Value': [amount]
                         })
@@ -525,7 +542,6 @@ elif st.session_state.page == "➕ Add":
             
             # Reverse Fuel
             if ttype == 'Expense' and 'Fuel' in category:
-                # Find matching fuel entry by date/amount
                 fuel_idx = st.session_state.fuel[
                     (st.session_state.fuel['Date'] == tx['Date']) & 
                     (st.session_state.fuel['Cost (₹)'] == amount)
@@ -652,64 +668,14 @@ elif st.session_state.page == "🏦 Bank":
             st.success("Balance Updated!")
             st.rerun()
 
-# ===================== MORE =====================
+# ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-    # Now only: Investments, EMI, Fuel, Goals, Reports
     tabs = st.tabs(["📈 Investments", "🏦 EMI", "⛽ Fuel", "🎯 Goals", "📊 Reports"])
     
-    # ---------- Investments ----------
+    # ---------- Investments (No initial setup, only manual add/delete) ----------
     with tabs[0]:
         st.dataframe(st.session_state.investments, hide_index=True, use_container_width=True)
-        
-        # One-time initial investment setup
-        with st.expander("✏️ Set Initial Investment (One-time)"):
-            st.info("Enter the total amount you have already invested in SIP and Gold before starting this app. This will only be added once.")
-            init_sip = st.number_input("SIP Initial Invested (₹)", min_value=0.0, step=100.0)
-            init_gold = st.number_input("Gold Initial Invested (₹)", min_value=0.0, step=100.0)
-            if st.button("Save Initial Investments"):
-                # Store in settings as JSON
-                initial_inv = {'SIP': init_sip, 'Gold': init_gold}
-                # Update the investments sheet with these entries if they don't exist
-                existing_names = st.session_state.investments['Name'].tolist()
-                # Add SIP if not exists and amount > 0
-                if init_sip > 0:
-                    if 'SIP' not in existing_names:
-                        new_sip = pd.DataFrame({
-                            'Name': ['SIP'],
-                            'Type': ['SIP'],
-                            'Amount': [0],
-                            'Frequency': ['Monthly'],
-                            'Total Invested': [init_sip],
-                            'Current Value': [init_sip]
-                        })
-                        st.session_state.investments = pd.concat([st.session_state.investments, new_sip], ignore_index=True)
-                    else:
-                        # Update existing SIP
-                        idx = st.session_state.investments[st.session_state.investments['Name'] == 'SIP'].index[0]
-                        st.session_state.investments.loc[idx, 'Total Invested'] += init_sip
-                        st.session_state.investments.loc[idx, 'Current Value'] += init_sip
-                if init_gold > 0:
-                    if 'Gold' not in existing_names:
-                        new_gold = pd.DataFrame({
-                            'Name': ['Gold'],
-                            'Type': ['Gold'],
-                            'Amount': [0],
-                            'Frequency': ['Monthly'],
-                            'Total Invested': [init_gold],
-                            'Current Value': [init_gold]
-                        })
-                        st.session_state.investments = pd.concat([st.session_state.investments, new_gold], ignore_index=True)
-                    else:
-                        idx = st.session_state.investments[st.session_state.investments['Name'] == 'Gold'].index[0]
-                        st.session_state.investments.loc[idx, 'Total Invested'] += init_gold
-                        st.session_state.investments.loc[idx, 'Current Value'] += init_gold
-                update_worksheet('Investments', st.session_state.investments)
-                st.cache_data.clear()
-                st.success("Initial investments added!")
-                st.rerun()
-        
-        # Add / Edit Investment (manual)
         with st.expander("➕ Add / Edit Investment"):
             inv_name = st.text_input("Investment Name")
             inv_type = st.selectbox("Type", ["SIP", "Gold", "MF", "Stock", "Other"])
@@ -734,10 +700,11 @@ elif st.session_state.page == "⚡ More":
                 st.success("Investment Deleted!")
                 st.rerun()
     
-    # ---------- EMI ----------
+    # ---------- EMI (One-time add option) ----------
     with tabs[1]:
         st.dataframe(st.session_state.emi, hide_index=True, use_container_width=True)
-        with st.expander("➕ Add EMI"):
+        with st.expander("➕ Add EMI (One-time setup)"):
+            st.info("Add your EMI loan details here. After this, future payments will be auto-synced from transactions.")
             loan = st.text_input("Loan Name")
             total = st.number_input("Total Loan ₹", min_value=0.0)
             emi = st.number_input("EMI per Month ₹", min_value=0.0)
@@ -809,7 +776,7 @@ elif st.session_state.page == "⚡ More":
                 st.success("Goal Deleted!")
                 st.rerun()
     
-    # ---------- Reports (Monthly Analysis for Fuel, EMI, Investment) ----------
+    # ---------- Reports (Monthly Analysis) ----------
     with tabs[4]:
         st.markdown("### 📊 Monthly Analysis")
         df = st.session_state.transactions
@@ -845,21 +812,19 @@ elif st.session_state.page == "⚡ More":
                 st.plotly_chart(fig3, use_container_width=True)
             
             # 4. EMI Monthly Payment Trend
-            emi_df = st.session_state.emi
-            if not emi_df.empty:
-                # We can show total EMI amount per month from transactions
-                emi_tx = df[(df['Category']=='EMI') & (df['Type']=='Expense')]
-                if not emi_tx.empty:
-                    emi_monthly = emi_tx.groupby('Month')['Amount'].sum().reset_index()
-                    fig4 = px.bar(emi_monthly, x='Month', y='Amount', title="🏦 EMI Payments Per Month", color_discrete_sequence=['#ef4444'])
-                    fig4.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
-                    st.plotly_chart(fig4, use_container_width=True)
+            emi_tx = df[(df['Category']=='EMI') & (df['Type']=='Expense')]
+            if not emi_tx.empty:
+                emi_monthly = emi_tx.groupby('Month')['Amount'].sum().reset_index()
+                fig4 = px.bar(emi_monthly, x='Month', y='Amount', title="🏦 EMI Payments Per Month", color_discrete_sequence=['#ef4444'])
+                fig4.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
+                st.plotly_chart(fig4, use_container_width=True)
             
-            # 5. Investment Growth (Total Invested vs Current Value)
+            # 5. Investment Growth (SIP+Gold)
             inv_df = st.session_state.investments
             if not inv_df.empty:
-                total_inv = inv_df['Total Invested'].sum() if 'Total Invested' in inv_df.columns else 0
-                curr_val = inv_df['Current Value'].sum() if 'Current Value' in inv_df.columns else 0
-                st.info(f"Total Invested: {format_currency(total_inv)} | Current Value: {format_currency(curr_val)} | ROI: {((curr_val/total_inv)-1)*100:.1f}%")
+                total_inv = inv_df[inv_df['Name'].isin(['SIP','Gold'])]['Total Invested'].sum()
+                curr_val = inv_df[inv_df['Name'].isin(['SIP','Gold'])]['Current Value'].sum()
+                if total_inv > 0:
+                    st.info(f"📈 Investment (SIP+Gold): Total Invested: {format_currency(total_inv)} | Current Value: {format_currency(curr_val)} | ROI: {((curr_val/total_inv)-1)*100:.1f}%")
         else:
             st.info("Add some transactions to see detailed reports.")
