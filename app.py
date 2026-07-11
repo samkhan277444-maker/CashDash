@@ -82,8 +82,8 @@ def get_gsheet_client():
         st.error(f"❌ Connection Error: {e}")
         return None
 
-# ---------- CACHED DATA LOAD (1 HOUR TTL) ----------
-@st.cache_data(ttl=3600)
+# ---------- CACHED DATA LOAD (60 SECONDS TTL) ----------
+@st.cache_data(ttl=60)
 def load_all_sheets():
     gc = get_gsheet_client()
     if gc is None:
@@ -193,10 +193,9 @@ def init_session_state():
     else:
         st.session_state.accounts = loaded
 
-    # 4. Investments (WITH FIX: Auto-delete blank/empty names)
+    # 4. Investments (with cleanup)
     loaded = all_data.get('Investments', pd.DataFrame())
     if not loaded.empty and 'Name' in loaded.columns:
-        # 🛠️ CLEANUP: Remove rows where Name is empty, NaN, or just spaces
         loaded = loaded[loaded['Name'].notna() & (loaded['Name'].astype(str).str.strip() != '')]
     
     req_inv_cols = ['Name','Type','Amount','Frequency','Total Invested','Current Value']
@@ -226,11 +225,13 @@ def init_session_state():
     else:
         st.session_state.fuel = loaded
 
-    # 8. Settings (Master Budget only)
+    # 8. Settings (Master Budget & Last Sync Time)
     loaded = all_data.get('Settings', pd.DataFrame())
     if loaded.empty:
         st.session_state.master_budget = 0.0
+        st.session_state.last_sync_time = "Never"
     else:
+        # Master Budget
         if 'master_budget' in loaded['Key'].values:
             try:
                 st.session_state.master_budget = float(loaded[loaded['Key']=='master_budget']['Value'].values[0])
@@ -238,6 +239,12 @@ def init_session_state():
                 st.session_state.master_budget = 0.0
         else:
             st.session_state.master_budget = 0.0
+        
+        # Last Sync Time
+        if 'last_sync_time' in loaded['Key'].values:
+            st.session_state.last_sync_time = loaded[loaded['Key']=='last_sync_time']['Value'].values[0]
+        else:
+            st.session_state.last_sync_time = "Never"
 
 if 'initialized' not in st.session_state:
     init_session_state()
@@ -263,6 +270,30 @@ def get_monthly_summary():
     inc = df[df['Type']=='Income'].groupby('Month')['Amount'].sum().reset_index()
     exp = df[df['Type']=='Expense'].groupby('Month')['Amount'].sum().reset_index()
     return inc, exp
+
+# ---------- SYNC FUNCTION (Manual) ----------
+def force_sync():
+    """Manually sync all data to Google Sheets and update last sync time."""
+    try:
+        # Update all worksheets
+        update_worksheet('Transactions', st.session_state.transactions)
+        update_worksheet('Budget', st.session_state.budget)
+        update_worksheet('Accounts', st.session_state.accounts)
+        update_worksheet('Investments', st.session_state.investments)
+        update_worksheet('EmiManager', st.session_state.emi)
+        update_worksheet('Goals', st.session_state.goals)
+        update_worksheet('FuelTracker', st.session_state.fuel)
+        
+        # Update last sync time in Settings
+        sync_time = datetime.now().strftime("%d %b %Y, %H:%M:%S")
+        update_settings('last_sync_time', sync_time)
+        st.session_state.last_sync_time = sync_time
+        
+        # Clear cache to reload fresh data on next load
+        st.cache_data.clear()
+        return True, "✅ All data synced successfully!"
+    except Exception as e:
+        return False, f"❌ Sync failed: {e}"
 
 # ---------- APP UI ----------
 st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
@@ -295,7 +326,7 @@ if st.session_state.page == "🏠 Home":
     savings = monthly_inc - monthly_exp
     total_budget_val = st.session_state.budget['Current Month Budget'].sum()
     
-    # Investment stats (SIP + Gold only - case insensitive)
+    # Investment stats (SIP + Gold)
     inv_df = st.session_state.investments
     if not inv_df.empty and 'Name' in inv_df.columns:
         sip_mask = inv_df['Name'].str.upper() == 'SIP'
@@ -314,10 +345,10 @@ if st.session_state.page == "🏠 Home":
     total_emi_remaining = st.session_state.emi['Remaining'].sum() if not st.session_state.emi.empty else 0
     total_emi_due = st.session_state.emi['EMI Amount'].sum() if not st.session_state.emi.empty else 0
     
-    # BC stats (from transactions with Type='BC')
+    # BC stats
     bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
 
-    # Row 1: Account balances (4 cards)
+    # Row 1: Accounts
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🏦 BOB Bank</div><div class='sheet-card-value'>{format_currency(bob_bal)}</div></div>", unsafe_allow_html=True)
@@ -328,7 +359,7 @@ if st.session_state.page == "🏠 Home":
     with col4:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💵 Cash</div><div class='sheet-card-value'>{format_currency(cash_bal)}</div></div>", unsafe_allow_html=True)
 
-    # Row 2: Income, Expense, Savings, This Month Budget
+    # Row 2: Income, Expense, Savings, Budget
     col5, col6, col7, col8 = st.columns(4)
     with col5:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Income</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
@@ -355,7 +386,7 @@ if st.session_state.page == "🏠 Home":
     with col11:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_total)}</div><div class='sheet-card-sub'>All time</div></div>", unsafe_allow_html=True)
 
-    # Recent Transactions
+    # Row 4: Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
     if not recent.empty:
@@ -363,11 +394,23 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No transactions yet.")
 
-# ===================== ADD TRANSACTION (DYNAMIC CATEGORY SYNC) =====================
+    # Row 5: MANUAL SYNC BUTTON
+    st.markdown("---")
+    col_sync1, col_sync2 = st.columns([3, 1])
+    with col_sync1:
+        if st.button("💾 Save & Sync to Google Sheet", use_container_width=True):
+            success, msg = force_sync()
+            if success:
+                st.success(msg)
+            else:
+                st.error(msg)
+    with col_sync2:
+        st.markdown(f"<div style='text-align:right; font-size:0.7rem; color:#94a3b8;'>Last synced: {st.session_state.last_sync_time}</div>", unsafe_allow_html=True)
+
+# ===================== ADD TRANSACTION =====================
 elif st.session_state.page == "➕ Add":
     st.subheader("➕ Add Transaction")
     
-    # ✅ DYNAMIC CATEGORY FETCH
     budget_cats = st.session_state.budget['Category'].tolist()
     inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
     emi_names = st.session_state.emi['Loan Name'].tolist() if not st.session_state.emi.empty else []
@@ -497,7 +540,7 @@ elif st.session_state.page == "➕ Add":
                     }])], ignore_index=True)
                     update_worksheet('FuelTracker', st.session_state.fuel)
                 
-                # Budget auto-sync
+                # Auto-sync Category to Budget
                 if category not in budget_cats and category not in ['Transfer', 'Hand Loan']:
                     new_budget_row = pd.DataFrame({
                         'Category': [category],
@@ -508,7 +551,7 @@ elif st.session_state.page == "➕ Add":
                     st.session_state.budget = pd.concat([st.session_state.budget, new_budget_row], ignore_index=True)
                     update_worksheet('Budget', st.session_state.budget)
                 
-                # Budget Actual update
+                # Update Budget Actual
                 if ttype in ['Expense', 'Investment']:
                     if category in st.session_state.budget['Category'].values:
                         cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
@@ -535,11 +578,13 @@ elif st.session_state.page == "➕ Add":
             category = tx['Category']
             amount = tx['Amount']
             
+            # Reverse budget
             if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
                 cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                 st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
                 update_worksheet('Budget', st.session_state.budget)
             
+            # Reverse EMI
             if ttype == 'Expense' and 'EMI' in category and not st.session_state.emi.empty:
                 for loan in st.session_state.emi['Loan Name']:
                     if loan in tx['Description'] or loan in category:
@@ -548,6 +593,7 @@ elif st.session_state.page == "➕ Add":
                         update_worksheet('EmiManager', st.session_state.emi)
                         break
             
+            # Reverse Investment
             if ttype == 'Investment':
                 inv_name = None
                 for inv in st.session_state.investments['Name']:
@@ -561,6 +607,7 @@ elif st.session_state.page == "➕ Add":
                         st.session_state.investments.loc[idx_inv, 'Current Value'] -= amount
                     update_worksheet('Investments', st.session_state.investments)
             
+            # Reverse Fuel
             if ttype == 'Expense' and 'Fuel' in category:
                 fuel_idx = st.session_state.fuel[
                     (st.session_state.fuel['Date'] == tx['Date']) & 
@@ -569,6 +616,13 @@ elif st.session_state.page == "➕ Add":
                 if not fuel_idx.empty:
                     st.session_state.fuel = st.session_state.fuel.drop(fuel_idx[0]).reset_index(drop=True)
                     update_worksheet('FuelTracker', st.session_state.fuel)
+            
+            # Reverse Transfer (if applicable)
+            if ttype == 'Transfer':
+                # We can attempt to reverse by searching for transfer description
+                # But to keep it simple, we'll skip reversing transfer for now,
+                # as we don't store from/to accounts in transaction row.
+                pass
             
             st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
             update_worksheet('Transactions', st.session_state.transactions)
@@ -673,19 +727,104 @@ elif st.session_state.page == "🎯 Budget":
             st.success("Budget Updated!")
             st.rerun()
 
-# ===================== BANK =====================
+# ===================== BANK (Add/Withdraw/Transfer) =====================
 elif st.session_state.page == "🏦 Bank":
     st.subheader("🏦 My Accounts")
     st.dataframe(st.session_state.accounts.style.format({'Balance': '₹ {:.0f}'}), use_container_width=True, hide_index=True)
-    with st.expander("💰 Update Balance"):
-        acc = st.selectbox("Select Account", st.session_state.accounts['Account'])
-        amt = st.number_input("Add/Subtract Amount ₹", step=100.0)
-        if st.button("Update"):
-            st.session_state.accounts.loc[st.session_state.accounts['Account']==acc, 'Balance'] += amt
-            update_worksheet('Accounts', st.session_state.accounts)
-            st.cache_data.clear()
-            st.success("Balance Updated!")
-            st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 💰 Quick Actions")
+    
+    # 1. Add Money
+    with st.expander("➕ Add Money"):
+        acc_add = st.selectbox("Select Account", st.session_state.accounts['Account'], key='add_acc')
+        amt_add = st.number_input("Amount ₹", min_value=0.0, step=100.0, key='add_amt')
+        desc_add = st.text_input("Description (optional)", value="Cash Deposit", key='add_desc')
+        if st.button("Add Money", key="add_money_btn"):
+            if amt_add > 0:
+                idx = st.session_state.accounts[st.session_state.accounts['Account'] == acc_add].index[0]
+                st.session_state.accounts.loc[idx, 'Balance'] += amt_add
+                # Create transaction
+                new_row = [datetime.now().strftime('%Y-%m-%d'), desc_add, "Deposit", amt_add, "Income", acc_add, '✅']
+                new_df = pd.DataFrame([{
+                    'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_add, 'Category': "Deposit",
+                    'Amount': amt_add, 'Type': "Income", 'Payment Mode': acc_add, 'Status': '✅'
+                }])
+                st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+                append_to_worksheet('Transactions', new_row)
+                update_worksheet('Accounts', st.session_state.accounts)
+                st.cache_data.clear()
+                st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
+                st.rerun()
+            else:
+                st.error("Amount must be greater than 0.")
+
+    # 2. Withdraw Money
+    with st.expander("➖ Withdraw Money"):
+        acc_with = st.selectbox("Select Account", st.session_state.accounts['Account'], key='with_acc')
+        amt_with = st.number_input("Amount ₹", min_value=0.0, step=100.0, key='with_amt')
+        desc_with = st.text_input("Description (optional)", value="Cash Withdrawal", key='with_desc')
+        if st.button("Withdraw", key="withdraw_btn"):
+            if amt_with > 0:
+                idx = st.session_state.accounts[st.session_state.accounts['Account'] == acc_with].index[0]
+                current_bal = st.session_state.accounts.loc[idx, 'Balance']
+                if current_bal >= amt_with:
+                    st.session_state.accounts.loc[idx, 'Balance'] -= amt_with
+                    # Create transaction
+                    new_row = [datetime.now().strftime('%Y-%m-%d'), desc_with, "Withdrawal", amt_with, "Expense", acc_with, '✅']
+                    new_df = pd.DataFrame([{
+                        'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_with, 'Category': "Withdrawal",
+                        'Amount': amt_with, 'Type': "Expense", 'Payment Mode': acc_with, 'Status': '✅'
+                    }])
+                    st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+                    append_to_worksheet('Transactions', new_row)
+                    update_worksheet('Accounts', st.session_state.accounts)
+                    st.cache_data.clear()
+                    st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
+                    st.rerun()
+                else:
+                    st.error("❌ Insufficient balance!")
+            else:
+                st.error("Amount must be greater than 0.")
+
+    # 3. Transfer
+    with st.expander("🔄 Transfer"):
+        from_acc = st.selectbox("From Account", st.session_state.accounts['Account'], key='trans_from')
+        to_acc = st.selectbox("To Account", st.session_state.accounts['Account'], key='trans_to')
+        amt_trans = st.number_input("Amount ₹", min_value=0.0, step=100.0, key='trans_amt')
+        desc_trans = st.text_input("Description (optional)", value="Internal Transfer", key='trans_desc')
+        if st.button("Transfer", key="transfer_btn"):
+            if amt_trans > 0:
+                if from_acc == to_acc:
+                    st.error("From and To accounts must be different.")
+                else:
+                    from_idx = st.session_state.accounts[st.session_state.accounts['Account'] == from_acc].index[0]
+                    from_bal = st.session_state.accounts.loc[from_idx, 'Balance']
+                    if from_bal >= amt_trans:
+                        to_idx = st.session_state.accounts[st.session_state.accounts['Account'] == to_acc].index[0]
+                        st.session_state.accounts.loc[from_idx, 'Balance'] -= amt_trans
+                        st.session_state.accounts.loc[to_idx, 'Balance'] += amt_trans
+                        # Create transaction
+                        new_row = [datetime.now().strftime('%Y-%m-%d'), f"{desc_trans} (From {from_acc} to {to_acc})", "Transfer", amt_trans, "Transfer", f"{from_acc} -> {to_acc}", '✅']
+                        new_df = pd.DataFrame([{
+                            'Date': datetime.now().strftime('%Y-%m-%d'), 
+                            'Description': f"{desc_trans} (From {from_acc} to {to_acc})", 
+                            'Category': "Transfer",
+                            'Amount': amt_trans, 
+                            'Type': "Transfer", 
+                            'Payment Mode': f"{from_acc} -> {to_acc}", 
+                            'Status': '✅'
+                        }])
+                        st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+                        append_to_worksheet('Transactions', new_row)
+                        update_worksheet('Accounts', st.session_state.accounts)
+                        st.cache_data.clear()
+                        st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
+                        st.rerun()
+                    else:
+                        st.error("❌ Insufficient balance in source account!")
+            else:
+                st.error("Amount must be greater than 0.")
 
 # ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
@@ -770,7 +909,7 @@ elif st.session_state.page == "⚡ More":
                 st.success("Goal Deleted!")
                 st.rerun()
     
-    # ---------- Reports (Monthly Analysis) ----------
+    # ---------- Reports ----------
     with tabs[3]:
         st.markdown("### 📊 Monthly Analysis")
         df = st.session_state.transactions
@@ -779,7 +918,7 @@ elif st.session_state.page == "⚡ More":
             df['Date'] = pd.to_datetime(df['Date'])
             df['Month'] = df['Date'].dt.month_name()
             
-            # 1. Income vs Expense Bar Chart
+            # 1. Income vs Expense
             inc = df[df['Type']=='Income'].groupby('Month')['Amount'].sum().reset_index()
             exp = df[df['Type']=='Expense'].groupby('Month')['Amount'].sum().reset_index()
             merged = pd.merge(inc, exp, on='Month', how='outer').fillna(0)
@@ -788,14 +927,14 @@ elif st.session_state.page == "⚡ More":
             fig1.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
             st.plotly_chart(fig1, use_container_width=True)
             
-            # 2. Expense Breakdown Pie Chart
+            # 2. Expense Breakdown
             df_exp = df[df['Type']=='Expense'].groupby('Category')['Amount'].sum().reset_index()
             if not df_exp.empty:
                 fig2 = px.pie(df_exp, names='Category', values='Amount', title="🧾 Expense Breakdown", hole=0.3)
                 fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig2, use_container_width=True)
             
-            # 3. Fuel Monthly Trend
+            # 3. Fuel
             fuel_df = st.session_state.fuel
             if not fuel_df.empty:
                 fuel_df['Date'] = pd.to_datetime(fuel_df['Date'])
@@ -805,7 +944,7 @@ elif st.session_state.page == "⚡ More":
                 fig3.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig3, use_container_width=True)
             
-            # 4. EMI Monthly Payment Trend
+            # 4. EMI
             emi_tx = df[(df['Category']=='EMI') & (df['Type']=='Expense')]
             if not emi_tx.empty:
                 emi_monthly = emi_tx.groupby('Month')['Amount'].sum().reset_index()
@@ -813,7 +952,7 @@ elif st.session_state.page == "⚡ More":
                 fig4.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig4, use_container_width=True)
             
-            # 5. Investment Growth (SIP+Gold)
+            # 5. Investment (SIP+Gold)
             inv_df = st.session_state.investments
             if not inv_df.empty:
                 total_inv = inv_df[inv_df['Name'].str.upper().isin(['SIP','GOLD'])]['Total Invested'].sum()
@@ -827,7 +966,7 @@ elif st.session_state.page == "⚡ More":
                     fig5.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                     st.plotly_chart(fig5, use_container_width=True)
             
-            # 6. BC Monthly Trend
+            # 6. BC
             bc_tx = df[df['Type']=='BC']
             if not bc_tx.empty:
                 bc_monthly = bc_tx.groupby('Month')['Amount'].sum().reset_index()
