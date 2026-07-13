@@ -127,7 +127,6 @@ def append_to_worksheet(ws_name, row_data):
     except Exception as e:
         st.error(f"❌ Error syncing to Google Sheet: {e}")
 
-# UPDATED: Convert all data to string to avoid Timestamp JSON error, and auto-create missing sheets
 def update_worksheet(ws_name, df):
     gc = get_gsheet_client()
     if gc is None:
@@ -135,14 +134,12 @@ def update_worksheet(ws_name, df):
         return
     try:
         sh = gc.open(SHEET_NAME)
-        # Auto-create sheet if missing
         try:
             ws = sh.worksheet(ws_name)
         except gspread.exceptions.WorksheetNotFound:
             sh.add_worksheet(title=ws_name, rows=200, cols=20)
             ws = sh.worksheet(ws_name)
         ws.clear()
-        # 🛡️ FIX: Convert all columns to string to avoid Timestamp serialization issues
         df_clean = df.fillna('').astype(str)
         ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
     except Exception as e:
@@ -338,7 +335,7 @@ if st.session_state.page == "🏠 Home":
     current_month = datetime.now().strftime('%B')
     df_tx = st.session_state.transactions
     
-    # Account balances
+    # ✅ बैंक बैलेंस अब सही से कैलकुलेट होंगे (₹0 वाला टेम्पररी फिक्स हटा दिया गया है)
     bob_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='BOB Bank', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     bom_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='BOM Bank', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     upi_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='PhonePe Wallet', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
@@ -354,15 +351,6 @@ if st.session_state.page == "🏠 Home":
     
     savings = monthly_inc - monthly_exp
     total_budget_val = st.session_state.budget['Current Month Budget'].sum()
-
-    # 🛑 TEMPORARY FIX: SETTING BANK & EXPENSE CARDS TO ZERO FOR NOW
-    # To revert, just delete these 5 lines below.
-    bob_bal = 0
-    bom_bal = 0
-    upi_bal = 0
-    cash_bal = 0
-    monthly_exp = 0
-    # ----------------------------------------------------------------
     
     # Investment stats (SIP + Gold)
     inv_df = st.session_state.investments
@@ -486,7 +474,6 @@ elif st.session_state.page == "➕ Add":
         ttype = st.selectbox("Type", all_types, index=all_types.index(st.session_state.add_transaction_type) if st.session_state.add_transaction_type in all_types else 0, key='selected_type', on_change=on_type_change)
         st.session_state.add_transaction_type = ttype
         
-        # Auto assign nature
         default_nature_map = {
             "Income": "Income",
             "Expense": "Expense",
@@ -562,7 +549,6 @@ elif st.session_state.page == "➕ Add":
                 desc = f"Fuel - {f_litres:.1f} L"
     
     if st.button("✅ Add Transaction", key="submit_btn"):
-        # We'll store success/error messages and always rerun
         success_msg = None
         error_msg = None
         try:
@@ -655,7 +641,6 @@ elif st.session_state.page == "➕ Add":
         except Exception as e:
             error_msg = f"❌ Error: {e}"
         
-        # Always show message and rerun, so dashboard updates
         if success_msg:
             st.success(success_msg)
         if error_msg:
@@ -1163,7 +1148,7 @@ elif st.session_state.page == "⚡ More":
                     st.success(f"Category '{cat_to_del}' deleted!")
                     st.rerun()
         
-        # Custom Natures (separate row)
+        # Custom Natures
         st.markdown("#### 🌿 Custom Natures")
         st.info("Add new natures like 'Neutral', 'Credit', 'Debit'. (Default 'Income' and 'Expense' are protected and cannot be deleted.)")
         if not st.session_state.custom_natures.empty:
@@ -1211,7 +1196,6 @@ elif st.session_state.page == "⚡ More":
                 df_del['Display'] = df_del['Date'].astype(str) + " | " + df_del['Description'].astype(str) + " | ₹" + df_del['Amount'].astype(str)
                 to_delete = st.selectbox("Select transaction to delete", df_del['Display'])
                 if st.button("🗑️ Delete Selected Transaction"):
-                    # We'll use similar pattern to ensure rerun
                     success_msg = None
                     error_msg = None
                     try:
@@ -1222,7 +1206,7 @@ elif st.session_state.page == "⚡ More":
                         amount = tx['Amount']
                         payment_mode = tx['Payment Mode']
                         
-                        # Reverse budget, EMI, Investment, Fuel, Account Balance (same logic as above)
+                        # Reverse budget, EMI, Investment, Fuel, Account Balance (same logic)
                         if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
                             cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                             st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
