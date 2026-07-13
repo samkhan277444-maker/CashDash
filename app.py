@@ -401,174 +401,194 @@ if st.session_state.page == "🏠 Home":
     with col_sync2:
         st.markdown(f"<div style='text-align:right; font-size:0.7rem; color:#94a3b8;'>Last synced: {st.session_state.last_sync_time}</div>", unsafe_allow_html=True)
 
-# ===================== ADD TRANSACTION =====================
+# ===================== ADD TRANSACTION (WITH CATEGORY HIDE FOR INCOME) =====================
 elif st.session_state.page == "➕ Add":
     st.subheader("➕ Add Transaction")
     
+    # Prepare dynamic categories
     budget_cats = st.session_state.budget['Category'].tolist()
     inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
     emi_names = st.session_state.emi['Loan Name'].tolist() if not st.session_state.emi.empty else []
     goal_names = st.session_state.goals['Goal Name'].tolist() if not st.session_state.goals.empty else []
-    
     all_cats = list(set(['Transfer', 'Hand Loan'] + budget_cats + inv_names + emi_names + goal_names))
     all_cats = sorted(all_cats)
     
-    default_type = st.session_state.get('add_type', 'Income')
-    type_options = ["Income", "Expense", "Investment", "Transfer", "BC"]
+    # Use session state to store current type and trigger rerun on change
+    if 'add_transaction_type' not in st.session_state:
+        st.session_state.add_transaction_type = st.session_state.get('add_type', 'Income')
     
-    with st.form("add_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            date = st.date_input("Date")
-            desc = st.text_input("Description")
-            amount = st.number_input("Amount ₹", min_value=0.0)
-        with col2:
-            ttype = st.selectbox("Type", type_options, index=type_options.index(default_type) if default_type in type_options else 0)
+    # Define on_change callback
+    def on_type_change():
+        st.session_state.add_transaction_type = st.session_state.selected_type
+        # No need to rerun here, Streamlit will rerun automatically
+    
+    # Widgets
+    col1, col2 = st.columns(2)
+    with col1:
+        date = st.date_input("Date", datetime.now())
+        desc = st.text_input("Description")
+        amount = st.number_input("Amount ₹", min_value=0.0)
+    with col2:
+        type_options = ["Income", "Expense", "Investment", "Transfer", "BC"]
+        # Use selectbox with on_change to update session state
+        ttype = st.selectbox("Type", type_options, index=type_options.index(st.session_state.add_transaction_type) if st.session_state.add_transaction_type in type_options else 0, key='selected_type', on_change=on_type_change)
+        # Update session state manually
+        st.session_state.add_transaction_type = ttype
+        
+        # Category: show only if not Income
+        category = None
+        if ttype != "Income":
             category = st.selectbox("Category", all_cats)
-            payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+        else:
+            # For Income, auto-set category to "Salary" and hide the selectbox
+            category = "Salary"  # default
+            st.text("Category: Salary (auto-set for Income)")
         
-        # Transfer fields
-        from_acc = None
-        to_acc = None
-        if ttype == "Transfer":
-            from_acc = st.selectbox("From Account", st.session_state.accounts['Account'], key='from')
-            to_acc = st.selectbox("To Account", st.session_state.accounts['Account'], key='to')
-            if from_acc == to_acc:
-                st.warning("⚠️ From and To accounts must be different.")
-        
-        # EMI fields
-        is_emi = (category in emi_names) or ('emi' in desc.lower())
-        emi_loan = None
-        if is_emi and ttype == "Expense":
-            if not st.session_state.emi.empty:
-                loan_options = st.session_state.emi['Loan Name'].tolist()
-                emi_loan = st.selectbox("Select Loan for this EMI payment", loan_options)
-                if emi_loan:
-                    emi_row = st.session_state.emi[st.session_state.emi['Loan Name'] == emi_loan].iloc[0]
-                    st.info(f"💡 Remaining: {format_currency(emi_row['Remaining'])}. After payment: {format_currency(emi_row['Remaining'] - amount)}")
+        payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+    
+    # Transfer fields
+    from_acc = None
+    to_acc = None
+    if ttype == "Transfer":
+        from_acc = st.selectbox("From Account", st.session_state.accounts['Account'], key='from')
+        to_acc = st.selectbox("To Account", st.session_state.accounts['Account'], key='to')
+        if from_acc == to_acc:
+            st.warning("⚠️ From and To accounts must be different.")
+    
+    # EMI fields
+    is_emi = (ttype == "Expense") and (category in emi_names or (category and 'emi' in category.lower()))
+    emi_loan = None
+    if is_emi:
+        if not st.session_state.emi.empty:
+            loan_options = st.session_state.emi['Loan Name'].tolist()
+            emi_loan = st.selectbox("Select Loan for this EMI payment", loan_options)
+            if emi_loan:
+                emi_row = st.session_state.emi[st.session_state.emi['Loan Name'] == emi_loan].iloc[0]
+                st.info(f"💡 Remaining: {format_currency(emi_row['Remaining'])}. After payment: {format_currency(emi_row['Remaining'] - amount)}")
+        else:
+            st.info("No EMI loans added yet. Go to More > EMI to add a loan.")
+    
+    # Investment fields
+    is_investment = (ttype == "Investment") or (category and category in inv_names)
+    inv_name = None
+    if is_investment:
+        existing_inv = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
+        if category and category in existing_inv:
+            inv_name = category
+        else:
+            inv_options = ['New Investment'] + existing_inv
+            inv_name = st.selectbox("Select Investment", inv_options)
+            if inv_name == 'New Investment':
+                inv_name = st.text_input("Enter new investment name")
+        if inv_name in existing_inv:
+            inv_row = st.session_state.investments[st.session_state.investments['Name'] == inv_name]
+            if not inv_row.empty:
+                st.info(f"Current Total Invested: {format_currency(inv_row.iloc[0]['Total Invested'])}")
+    
+    # Fuel fields
+    is_fuel = (ttype == "Expense") and (category == 'Fuel' or (category and 'fuel' in category.lower()))
+    f_dist = None
+    f_litres = None
+    if is_fuel:
+        f_dist = st.number_input("Distance (km)", min_value=0.0, step=1.0)
+        f_litres = st.number_input("Fuel (L)", min_value=0.0, step=0.1)
+        if not desc.strip():
+            if f_dist > 0:
+                desc = f"Fuel - {f_litres:.1f} L, {f_dist:.1f} km"
             else:
-                st.info("No EMI loans added yet. Go to More > EMI to add a loan.")
-        
-        # Investment fields
-        is_investment = (ttype == "Investment") or (category in inv_names)
-        inv_name = None
-        if is_investment:
-            existing_inv = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
-            if category in existing_inv:
-                inv_name = category
+                desc = f"Fuel - {f_litres:.1f} L"
+    
+    # Submit button
+    if st.button("✅ Add Transaction", key="submit_btn"):
+        try:
+            new_row = [date.strftime('%Y-%m-%d'), desc, category, amount, ttype, payment_mode, '✅']
+            new_df = pd.DataFrame([{
+                'Date': date.strftime('%Y-%m-%d'), 'Description': desc, 'Category': category,
+                'Amount': amount, 'Type': ttype, 'Payment Mode': payment_mode, 'Status': '✅'
+            }])
+            st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+            append_to_worksheet('Transactions', new_row)
+            
+            # 1. Handle Transfer
+            if ttype == "Transfer" and from_acc and to_acc and from_acc != to_acc:
+                from_idx = st.session_state.accounts[st.session_state.accounts['Account'] == from_acc].index[0]
+                to_idx = st.session_state.accounts[st.session_state.accounts['Account'] == to_acc].index[0]
+                st.session_state.accounts.loc[from_idx, 'Balance'] -= amount
+                st.session_state.accounts.loc[to_idx, 'Balance'] += amount
+                update_worksheet('Accounts', st.session_state.accounts)
+            
+            # 2. Handle Payment Mode Balance
             else:
-                inv_options = ['New Investment'] + existing_inv
-                inv_name = st.selectbox("Select Investment", inv_options)
-                if inv_name == 'New Investment':
-                    inv_name = st.text_input("Enter new investment name")
-            if inv_name in existing_inv:
-                inv_row = st.session_state.investments[st.session_state.investments['Name'] == inv_name]
-                if not inv_row.empty:
-                    st.info(f"Current Total Invested: {format_currency(inv_row.iloc[0]['Total Invested'])}")
-        
-        # Fuel fields
-        is_fuel = (category == 'Fuel') or ('fuel' in desc.lower())
-        f_dist = None
-        f_litres = None
-        if is_fuel and ttype == "Expense":
-            f_dist = st.number_input("Distance (km)", min_value=0.0, step=1.0)
-            f_litres = st.number_input("Fuel (L)", min_value=0.0, step=0.1)
-            if not desc.strip():
-                if f_dist > 0:
-                    desc = f"Fuel - {f_litres:.1f} L, {f_dist:.1f} km"
-                else:
-                    desc = f"Fuel - {f_litres:.1f} L"
-        
-        if st.form_submit_button("✅ Add Transaction", key="submit_btn"):
-            try:
-                new_row = [date.strftime('%Y-%m-%d'), desc, category, amount, ttype, payment_mode, '✅']
-                new_df = pd.DataFrame([{
-                    'Date': date.strftime('%Y-%m-%d'), 'Description': desc, 'Category': category,
-                    'Amount': amount, 'Type': ttype, 'Payment Mode': payment_mode, 'Status': '✅'
-                }])
-                st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
-                append_to_worksheet('Transactions', new_row)
-                
-                # 1. Handle Transfer
-                if ttype == "Transfer" and from_acc and to_acc and from_acc != to_acc:
-                    from_idx = st.session_state.accounts[st.session_state.accounts['Account'] == from_acc].index[0]
-                    to_idx = st.session_state.accounts[st.session_state.accounts['Account'] == to_acc].index[0]
-                    st.session_state.accounts.loc[from_idx, 'Balance'] -= amount
-                    st.session_state.accounts.loc[to_idx, 'Balance'] += amount
+                acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
+                if not acc_idx.empty:
+                    idx = acc_idx[0]
+                    if ttype in ["Income"]:
+                        st.session_state.accounts.loc[idx, 'Balance'] += amount
+                    elif ttype in ["Expense", "Investment", "BC"]:
+                        st.session_state.accounts.loc[idx, 'Balance'] -= amount
                     update_worksheet('Accounts', st.session_state.accounts)
-                
-                # 2. Handle Payment Mode Balance
+            
+            # 3. Handle EMI
+            if is_emi and ttype == "Expense" and emi_loan and amount > 0:
+                emi_idx = st.session_state.emi[st.session_state.emi['Loan Name'] == emi_loan].index[0]
+                current_remaining = st.session_state.emi.loc[emi_idx, 'Remaining']
+                st.session_state.emi.loc[emi_idx, 'Remaining'] = max(0, current_remaining - amount)
+                update_worksheet('EmiManager', st.session_state.emi)
+            
+            # 4. Handle Investment
+            if is_investment and inv_name and amount > 0:
+                if inv_name in st.session_state.investments['Name'].values:
+                    idx = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
+                    st.session_state.investments.loc[idx, 'Total Invested'] += amount
+                    if 'Current Value' in st.session_state.investments.columns:
+                        st.session_state.investments.loc[idx, 'Current Value'] += amount
                 else:
-                    acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
-                    if not acc_idx.empty:
-                        idx = acc_idx[0]
-                        if ttype in ["Income"]:
-                            st.session_state.accounts.loc[idx, 'Balance'] += amount
-                        elif ttype in ["Expense", "Investment", "BC"]:
-                            st.session_state.accounts.loc[idx, 'Balance'] -= amount
-                        update_worksheet('Accounts', st.session_state.accounts)
-                
-                # 3. Handle EMI
-                if is_emi and ttype == "Expense" and emi_loan and amount > 0:
-                    emi_idx = st.session_state.emi[st.session_state.emi['Loan Name'] == emi_loan].index[0]
-                    current_remaining = st.session_state.emi.loc[emi_idx, 'Remaining']
-                    st.session_state.emi.loc[emi_idx, 'Remaining'] = max(0, current_remaining - amount)
-                    update_worksheet('EmiManager', st.session_state.emi)
-                
-                # 4. Handle Investment
-                if is_investment and inv_name and amount > 0:
-                    if inv_name in st.session_state.investments['Name'].values:
-                        idx = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
-                        st.session_state.investments.loc[idx, 'Total Invested'] += amount
-                        if 'Current Value' in st.session_state.investments.columns:
-                            st.session_state.investments.loc[idx, 'Current Value'] += amount
-                    else:
-                        new_inv = pd.DataFrame({
-                            'Name': [inv_name],
-                            'Type': ['Other'],
-                            'Amount': [0],
-                            'Frequency': ['Monthly'],
-                            'Total Invested': [amount],
-                            'Current Value': [amount]
-                        })
-                        st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
-                    update_worksheet('Investments', st.session_state.investments)
-                
-                # 5. Handle Fuel
-                if is_fuel and ttype == "Expense" and f_dist is not None and f_litres is not None:
-                    fuel_row = [date.strftime('%Y-%m-%d'), f_dist, f_litres, amount]
-                    st.session_state.fuel = pd.concat([st.session_state.fuel, pd.DataFrame([{
-                        'Date': date.strftime('%Y-%m-%d'),
-                        'Distance (km)': f_dist,
-                        'Fuel (L)': f_litres,
-                        'Cost (₹)': amount
-                    }])], ignore_index=True)
-                    update_worksheet('FuelTracker', st.session_state.fuel)
-                
-                # 6. Auto-sync Category to Budget
-                if category not in budget_cats and category not in ['Transfer', 'Hand Loan']:
-                    new_budget_row = pd.DataFrame({
-                        'Category': [category],
-                        'Current Month Budget': [0.0],
-                        'Previous Month Budget': [0.0],
-                        'Actual This Month': [amount if ttype == 'Expense' else 0.0]
+                    new_inv = pd.DataFrame({
+                        'Name': [inv_name],
+                        'Type': ['Other'],
+                        'Amount': [0],
+                        'Frequency': ['Monthly'],
+                        'Total Invested': [amount],
+                        'Current Value': [amount]
                     })
-                    st.session_state.budget = pd.concat([st.session_state.budget, new_budget_row], ignore_index=True)
+                    st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
+                update_worksheet('Investments', st.session_state.investments)
+            
+            # 5. Handle Fuel
+            if is_fuel and ttype == "Expense" and f_dist is not None and f_litres is not None:
+                fuel_row = [date.strftime('%Y-%m-%d'), f_dist, f_litres, amount]
+                st.session_state.fuel = pd.concat([st.session_state.fuel, pd.DataFrame([{
+                    'Date': date.strftime('%Y-%m-%d'),
+                    'Distance (km)': f_dist,
+                    'Fuel (L)': f_litres,
+                    'Cost (₹)': amount
+                }])], ignore_index=True)
+                update_worksheet('FuelTracker', st.session_state.fuel)
+            
+            # 6. Auto-sync Category to Budget
+            if category not in budget_cats and category not in ['Transfer', 'Hand Loan']:
+                new_budget_row = pd.DataFrame({
+                    'Category': [category],
+                    'Current Month Budget': [0.0],
+                    'Previous Month Budget': [0.0],
+                    'Actual This Month': [amount if ttype == 'Expense' else 0.0]
+                })
+                st.session_state.budget = pd.concat([st.session_state.budget, new_budget_row], ignore_index=True)
+                update_worksheet('Budget', st.session_state.budget)
+            
+            # 7. Update Budget Actual
+            if ttype in ['Expense', 'Investment']:
+                if category in st.session_state.budget['Category'].values:
+                    cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
+                    current_actual = st.session_state.budget.loc[cat_idx, 'Actual This Month']
+                    st.session_state.budget.loc[cat_idx, 'Actual This Month'] = current_actual + amount
                     update_worksheet('Budget', st.session_state.budget)
-                
-                # 7. Update Budget Actual
-                if ttype in ['Expense', 'Investment']:
-                    if category in st.session_state.budget['Category'].values:
-                        cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
-                        current_actual = st.session_state.budget.loc[cat_idx, 'Actual This Month']
-                        st.session_state.budget.loc[cat_idx, 'Actual This Month'] = current_actual + amount
-                        update_worksheet('Budget', st.session_state.budget)
-                
-                st.cache_data.clear()
-                st.success("✅ Transaction Saved Successfully! (Balances, Budget, EMI, Fuel, Investments updated)")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
+            
+            st.cache_data.clear()
+            st.success("✅ Transaction Saved Successfully! (Balances, Budget, EMI, Fuel, Investments updated)")
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
 
     st.markdown("---")
     st.markdown("### 🗑️ Delete a Transaction")
@@ -839,7 +859,6 @@ elif st.session_state.page == "🏦 Bank":
 # ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-    # Now we have 5 tabs: Investments, EMI, Goals, Reports, All Transactions
     tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "📋 All Transactions"])
     
     # ---------- Investments ----------
@@ -987,49 +1006,31 @@ elif st.session_state.page == "⚡ More":
         else:
             st.info("Add some transactions to see detailed reports.")
     
-    # ---------- All Transactions (New Tab) ----------
+    # ---------- All Transactions ----------
     with tabs[4]:
         st.markdown("### 📋 All Transactions")
         df = st.session_state.transactions
-        
         if not df.empty:
-            # Show all transactions with delete button per row
-            # We'll create a column with delete button for each row
-            # Using st.dataframe with selection or custom buttons is tricky, 
-            # so we'll display the full dataframe and a delete option below.
             st.dataframe(df.sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
-            
-            # Delete option: select row by index
             st.markdown("#### 🗑️ Delete a Transaction")
             if not df.empty:
-                # Create a dropdown with Date + Description to select
                 df_del = df.copy()
                 df_del['Display'] = df_del['Date'].astype(str) + " | " + df_del['Description'].astype(str) + " | ₹" + df_del['Amount'].astype(str)
                 to_delete = st.selectbox("Select transaction to delete", df_del['Display'])
                 if st.button("🗑️ Delete Selected Transaction"):
                     idx = df_del[df_del['Display'] == to_delete].index[0]
-                    # Use the same reverse logic as before
                     tx = st.session_state.transactions.iloc[idx]
                     ttype = tx['Type']
                     category = tx['Category']
                     amount = tx['Amount']
                     payment_mode = tx['Payment Mode']
                     
-                    # Reverse budget, EMI, Investment, Fuel, Account Balance (similar to earlier delete)
-                    # We'll reuse the same code as in the Add page delete section
-                    # For brevity, we'll just call the same deletion logic from a helper function
-                    # However, we have the code above in the Add page delete section. 
-                    # We'll copy that logic here.
-                    # (In production code, you'd abstract this into a function)
-                    # For simplicity, we'll just copy the logic:
-                    
-                    # Reverse budget
+                    # Reverse logic same as before
                     if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
                         cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                         st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
                         update_worksheet('Budget', st.session_state.budget)
                     
-                    # Reverse EMI
                     if ttype == 'Expense' and 'EMI' in category and not st.session_state.emi.empty:
                         for loan in st.session_state.emi['Loan Name']:
                             if loan in tx['Description'] or loan in category:
@@ -1038,7 +1039,6 @@ elif st.session_state.page == "⚡ More":
                                 update_worksheet('EmiManager', st.session_state.emi)
                                 break
                     
-                    # Reverse Investment
                     if ttype == 'Investment':
                         inv_name = None
                         for inv in st.session_state.investments['Name']:
@@ -1052,7 +1052,6 @@ elif st.session_state.page == "⚡ More":
                                 st.session_state.investments.loc[idx_inv, 'Current Value'] -= amount
                             update_worksheet('Investments', st.session_state.investments)
                     
-                    # Reverse Fuel
                     if ttype == 'Expense' and 'Fuel' in category:
                         fuel_idx = st.session_state.fuel[
                             (st.session_state.fuel['Date'] == tx['Date']) & 
@@ -1062,7 +1061,6 @@ elif st.session_state.page == "⚡ More":
                             st.session_state.fuel = st.session_state.fuel.drop(fuel_idx[0]).reset_index(drop=True)
                             update_worksheet('FuelTracker', st.session_state.fuel)
                     
-                    # Reverse Account Balance
                     if ttype != "Transfer":
                         acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                         if not acc_idx.empty:
@@ -1073,11 +1071,10 @@ elif st.session_state.page == "⚡ More":
                                 st.session_state.accounts.loc[idx, 'Balance'] += amount
                             update_worksheet('Accounts', st.session_state.accounts)
                     
-                    # Delete transaction
                     st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
                     update_worksheet('Transactions', st.session_state.transactions)
                     st.cache_data.clear()
-                    st.success("✅ Transaction Deleted successfully! (All synced data reversed)")
+                    st.success("✅ Transaction Deleted successfully!")
                     st.rerun()
         else:
             st.info("No transactions yet.")
