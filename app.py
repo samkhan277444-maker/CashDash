@@ -335,7 +335,7 @@ if st.session_state.page == "🏠 Home":
     current_month = datetime.now().strftime('%B')
     df_tx = st.session_state.transactions
     
-    # ✅ बैंक बैलेंस अब सही से कैलकुलेट होंगे (₹0 वाला टेम्पररी फिक्स हटा दिया गया है)
+    # Bank balances
     bob_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='BOB Bank', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     bom_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='BOM Bank', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     upi_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='PhonePe Wallet', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
@@ -352,7 +352,7 @@ if st.session_state.page == "🏠 Home":
     savings = monthly_inc - monthly_exp
     total_budget_val = st.session_state.budget['Current Month Budget'].sum()
     
-    # Investment stats (SIP + Gold)
+    # Investment stats
     inv_df = st.session_state.investments
     if not inv_df.empty and 'Name' in inv_df.columns:
         sip_mask = inv_df['Name'].str.upper() == 'SIP'
@@ -934,6 +934,18 @@ elif st.session_state.page == "🏦 Bank":
                         st.error("❌ Insufficient balance in source account!")
             else:
                 st.error("Amount must be greater than 0.")
+
+    # 🔴 Reset All Balances to Zero
+    st.markdown("---")
+    with st.expander("⚠️ Reset All Account Balances to Zero"):
+        st.error("This will set all bank, wallet, and cash balances to ₹0. This action cannot be undone.")
+        if st.button("✅ Yes, Reset All Balances to ₹0", key="reset_balances_btn"):
+            # Set all balances to 0.0 directly
+            st.session_state.accounts['Balance'] = 0.0
+            update_worksheet('Accounts', st.session_state.accounts)
+            st.cache_data.clear()
+            st.success("✅ All account balances reset to ₹0!")
+            st.rerun()
 
 # ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
