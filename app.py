@@ -134,13 +134,19 @@ def update_worksheet(ws_name, df):
         return
     try:
         sh = gc.open(SHEET_NAME)
-        ws = sh.worksheet(ws_name)
+        
+        # 🛡️ FIX: अगर टैब नहीं है, तो खुद बना ले
+        try:
+            ws = sh.worksheet(ws_name)
+        except gspread.exceptions.WorksheetNotFound:
+            sh.add_worksheet(title=ws_name, rows=200, cols=20)
+            ws = sh.worksheet(ws_name)
+        
         ws.clear()
         df_clean = df.fillna('')
         ws.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
     except Exception as e:
-        st.warning(f"⚠️ Update failed: {e}")
-
+        st.warning(f"⚠️ Update failed for '{ws_name}': {e}")
 def update_settings(key, value):
     gc = get_gsheet_client()
     if gc is None: return
