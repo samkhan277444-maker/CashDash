@@ -91,7 +91,7 @@ def load_all_sheets():
     
     data = {}
     worksheet_names = ['Transactions', 'Budget', 'Accounts', 'Investments', 'EmiManager', 
-                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories']
+                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories', 'CustomNatures']
     
     try:
         sh = gc.open(SHEET_NAME)
@@ -262,6 +262,14 @@ def init_session_state():
     else:
         st.session_state.custom_categories = loaded
 
+    # 11. Custom Natures
+    loaded = all_data.get('CustomNatures', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Nature']):
+        # Default natures: Income, Expense (cannot delete)
+        st.session_state.custom_natures = pd.DataFrame({'Nature': ['Income', 'Expense']})
+    else:
+        st.session_state.custom_natures = loaded
+
 if 'initialized' not in st.session_state:
     init_session_state()
     st.session_state.initialized = True
@@ -299,6 +307,7 @@ def force_sync():
         update_worksheet('FuelTracker', st.session_state.fuel)
         update_worksheet('CustomTypes', st.session_state.custom_types)
         update_worksheet('CustomCategories', st.session_state.custom_categories)
+        update_worksheet('CustomNatures', st.session_state.custom_natures)
         
         sync_time = datetime.now().strftime("%d %b %Y, %H:%M:%S")
         update_settings('last_sync_time', sync_time)
@@ -473,12 +482,36 @@ elif st.session_state.page == "➕ Add":
         ttype = st.selectbox("Type", all_types, index=all_types.index(st.session_state.add_transaction_type) if st.session_state.add_transaction_type in all_types else 0, key='selected_type', on_change=on_type_change)
         st.session_state.add_transaction_type = ttype
         
+        # Nature: determine based on type and custom natures
+        # For default types, we have default natures:
+        default_nature_map = {
+            "Income": "Income",
+            "Expense": "Expense",
+            "Investment": "Expense",  # Actually it's an expense for balance
+            "Transfer": "Neutral",
+            "BC": "Expense"
+        }
+        # For custom types, we look up their nature from custom_types
+        custom_nature = None
+        if ttype in st.session_state.custom_types['TypeName'].values:
+            custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+        
+        # Get the effective nature
+        if custom_nature:
+            nature = custom_nature
+        else:
+            nature = default_nature_map.get(ttype, "Income")  # fallback
+        
+        # Show nature (but we don't let user change it directly; it's auto)
+        st.text(f"Nature: {nature} (auto-assigned)")
+        
+        # Category
         category = None
-        if ttype != "Income":
+        if ttype != "Income" and nature != "Income":  # if nature is Income, category hidden
             category = st.selectbox("Category", all_cats)
         else:
-            category = "Salary"
-            st.text("Category: Salary (auto-set for Income)")
+            category = "Salary" if ttype == "Income" else "General"
+            st.text(f"Category: {category} (auto-set)")
         
         payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
     
@@ -557,9 +590,12 @@ elif st.session_state.page == "➕ Add":
                 acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                 if not acc_idx.empty:
                     idx = acc_idx[0]
-                    if ttype in ["Income"]:
+                    if nature == "Income":
                         st.session_state.accounts.loc[idx, 'Balance'] += amount
-                    elif ttype in ["Expense", "Investment", "BC"]:
+                    elif nature in ["Expense", "BC"]:
+                        st.session_state.accounts.loc[idx, 'Balance'] -= amount
+                    # For Investment, we also reduce balance (treat as expense)
+                    elif nature == "Expense" and ttype == "Investment":
                         st.session_state.accounts.loc[idx, 'Balance'] -= amount
                     update_worksheet('Accounts', st.session_state.accounts)
             
@@ -682,9 +718,22 @@ elif st.session_state.page == "➕ Add":
                 acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                 if not acc_idx.empty:
                     idx = acc_idx[0]
-                    if ttype == "Income":
+                    # Determine nature for this ttype (use same logic as add)
+                    default_nature_map = {
+                        "Income": "Income",
+                        "Expense": "Expense",
+                        "Investment": "Expense",
+                        "Transfer": "Neutral",
+                        "BC": "Expense"
+                    }
+                    custom_nature = None
+                    if ttype in st.session_state.custom_types['TypeName'].values:
+                        custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+                    nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                    
+                    if nature == "Income":
                         st.session_state.accounts.loc[idx, 'Balance'] -= amount
-                    elif ttype in ["Expense", "Investment", "BC"]:
+                    elif nature in ["Expense", "BC"]:
                         st.session_state.accounts.loc[idx, 'Balance'] += amount
                     update_worksheet('Accounts', st.session_state.accounts)
             
@@ -1043,8 +1092,8 @@ elif st.session_state.page == "⚡ More":
     
     # ---------- Customization ----------
     with tabs[4]:
-        st.markdown("### ⚙️ Custom Types & Categories")
-        st.info("Add your own Transaction Types (e.g., Hand Loan, Gift) and Categories (e.g., Medical, Travel). They will appear in the Add Transaction dropdowns.")
+        st.markdown("### ⚙️ Custom Types, Categories & Natures")
+        st.info("Add your own Transaction Types, Categories, and Natures. They will appear in the Add Transaction dropdowns.")
         
         col_t1, col_t2 = st.columns(2)
         with col_t1:
@@ -1056,7 +1105,7 @@ elif st.session_state.page == "⚡ More":
             
             with st.form("add_custom_type"):
                 type_name = st.text_input("Type Name")
-                type_nature = st.selectbox("Nature", ["Income", "Expense"])
+                type_nature = st.selectbox("Nature", st.session_state.custom_natures['Nature'].tolist())
                 if st.form_submit_button("Add Type"):
                     if type_name:
                         new_type = pd.DataFrame({'TypeName':[type_name], 'Nature':[type_nature]})
@@ -1103,6 +1152,44 @@ elif st.session_state.page == "⚡ More":
                     st.cache_data.clear()
                     st.success(f"Category '{cat_to_del}' deleted!")
                     st.rerun()
+        
+        # Custom Natures (separate row)
+        st.markdown("#### 🌿 Custom Natures")
+        st.info("Add new natures like 'Neutral', 'Credit', 'Debit'. (Default 'Income' and 'Expense' are protected and cannot be deleted.)")
+        if not st.session_state.custom_natures.empty:
+            st.dataframe(st.session_state.custom_natures, hide_index=True, use_container_width=True)
+        else:
+            st.info("No custom natures added yet.")
+        
+        with st.form("add_custom_nature"):
+            nature_name = st.text_input("Nature Name")
+            if st.form_submit_button("Add Nature"):
+                if nature_name:
+                    # Check if already exists
+                    if nature_name in st.session_state.custom_natures['Nature'].values:
+                        st.warning("Nature already exists.")
+                    else:
+                        new_nature = pd.DataFrame({'Nature':[nature_name]})
+                        st.session_state.custom_natures = pd.concat([st.session_state.custom_natures, new_nature], ignore_index=True)
+                        update_worksheet('CustomNatures', st.session_state.custom_natures)
+                        st.cache_data.clear()
+                        st.success(f"Nature '{nature_name}' added!")
+                        st.rerun()
+        
+        if not st.session_state.custom_natures.empty:
+            # Show only natures that are not 'Income' or 'Expense' for deletion
+            deletable_natures = st.session_state.custom_natures[~st.session_state.custom_natures['Nature'].isin(['Income', 'Expense'])]
+            if not deletable_natures.empty:
+                nature_to_del = st.selectbox("Delete a Custom Nature", deletable_natures['Nature'])
+                if st.button("🗑️ Delete Nature"):
+                    idx = st.session_state.custom_natures[st.session_state.custom_natures['Nature'] == nature_to_del].index[0]
+                    st.session_state.custom_natures = st.session_state.custom_natures.drop(idx).reset_index(drop=True)
+                    update_worksheet('CustomNatures', st.session_state.custom_natures)
+                    st.cache_data.clear()
+                    st.success(f"Nature '{nature_to_del}' deleted!")
+                    st.rerun()
+            else:
+                st.info("Only custom natures can be deleted. 'Income' and 'Expense' are default.")
     
     # ---------- All Transactions ----------
     with tabs[5]:
@@ -1123,7 +1210,13 @@ elif st.session_state.page == "⚡ More":
                     amount = tx['Amount']
                     payment_mode = tx['Payment Mode']
                     
-                    # Reverse budget, EMI, Investment, Fuel, Account Balance (same as before)
+                    # Reverse logic (same as before)
+                    # We'll reuse the same reversal code as in the Add page delete section
+                    # For brevity, we'll call the same function or repeat.
+                    # To avoid duplication, we can define a function but for now we'll repeat.
+                    # Since we already have the logic above, we'll copy it.
+                    # Let's simplify: we'll just call the same block by using a function.
+                    # But for code size, we'll just repeat the essential reversal lines.
                     if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
                         cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                         st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
@@ -1163,9 +1256,22 @@ elif st.session_state.page == "⚡ More":
                         acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                         if not acc_idx.empty:
                             idx = acc_idx[0]
-                            if ttype == "Income":
+                            # Determine nature similarly
+                            default_nature_map = {
+                                "Income": "Income",
+                                "Expense": "Expense",
+                                "Investment": "Expense",
+                                "Transfer": "Neutral",
+                                "BC": "Expense"
+                            }
+                            custom_nature = None
+                            if ttype in st.session_state.custom_types['TypeName'].values:
+                                custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+                            nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                            
+                            if nature == "Income":
                                 st.session_state.accounts.loc[idx, 'Balance'] -= amount
-                            elif ttype in ["Expense", "Investment", "BC"]:
+                            elif nature in ["Expense", "BC"]:
                                 st.session_state.accounts.loc[idx, 'Balance'] += amount
                             update_worksheet('Accounts', st.session_state.accounts)
                     
