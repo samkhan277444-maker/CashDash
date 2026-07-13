@@ -91,7 +91,7 @@ def load_all_sheets():
     
     data = {}
     worksheet_names = ['Transactions', 'Budget', 'Accounts', 'Investments', 'EmiManager', 
-                       'Goals', 'FuelTracker', 'Settings']
+                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories']
     
     try:
         sh = gc.open(SHEET_NAME)
@@ -113,7 +113,9 @@ def load_all_sheets():
 
 def append_to_worksheet(ws_name, row_data):
     gc = get_gsheet_client()
-    if gc is None: return
+    if gc is None:
+        st.error("❌ Google Sheet not connected. Data saved locally only.")
+        return
     try:
         sh = gc.open(SHEET_NAME)
         try:
@@ -123,11 +125,13 @@ def append_to_worksheet(ws_name, row_data):
             ws = sh.worksheet(ws_name)
         ws.append_row(row_data)
     except Exception as e:
-        st.error(f"❌ Error syncing: {e}")
+        st.error(f"❌ Error syncing to Google Sheet: {e}")
 
 def update_worksheet(ws_name, df):
     gc = get_gsheet_client()
-    if gc is None: return
+    if gc is None:
+        st.error("❌ Google Sheet not connected. Update failed.")
+        return
     try:
         sh = gc.open(SHEET_NAME)
         ws = sh.worksheet(ws_name)
@@ -225,7 +229,7 @@ def init_session_state():
     else:
         st.session_state.fuel = loaded
 
-    # 8. Settings
+    # 8. Settings (Master Budget & Last Sync)
     loaded = all_data.get('Settings', pd.DataFrame())
     if loaded.empty:
         st.session_state.master_budget = 0.0
@@ -243,6 +247,20 @@ def init_session_state():
             st.session_state.last_sync_time = loaded[loaded['Key']=='last_sync_time']['Value'].values[0]
         else:
             st.session_state.last_sync_time = "Never"
+
+    # 9. Custom Types
+    loaded = all_data.get('CustomTypes', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['TypeName','Nature']):
+        st.session_state.custom_types = pd.DataFrame(columns=['TypeName','Nature'])
+    else:
+        st.session_state.custom_types = loaded
+
+    # 10. Custom Categories
+    loaded = all_data.get('CustomCategories', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Category']):
+        st.session_state.custom_categories = pd.DataFrame(columns=['Category'])
+    else:
+        st.session_state.custom_categories = loaded
 
 if 'initialized' not in st.session_state:
     init_session_state()
@@ -279,6 +297,8 @@ def force_sync():
         update_worksheet('EmiManager', st.session_state.emi)
         update_worksheet('Goals', st.session_state.goals)
         update_worksheet('FuelTracker', st.session_state.fuel)
+        update_worksheet('CustomTypes', st.session_state.custom_types)
+        update_worksheet('CustomCategories', st.session_state.custom_categories)
         
         sync_time = datetime.now().strftime("%d %b %Y, %H:%M:%S")
         update_settings('last_sync_time', sync_time)
@@ -319,6 +339,15 @@ if st.session_state.page == "🏠 Home":
     
     savings = monthly_inc - monthly_exp
     total_budget_val = st.session_state.budget['Current Month Budget'].sum()
+
+    # 🛑 TEMPORARY FIX: SETTING BANK & EXPENSE CARDS TO ZERO FOR NOW
+    # To revert, just delete these 5 lines below.
+    bob_bal = 0
+    bom_bal = 0
+    upi_bal = 0
+    cash_bal = 0
+    monthly_exp = 0
+    # ----------------------------------------------------------------
     
     # Investment stats (SIP + Gold)
     inv_df = st.session_state.investments
@@ -342,7 +371,7 @@ if st.session_state.page == "🏠 Home":
     # BC stats
     bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
 
-    # Hand Loan stats: Outstanding = Total Income (category 'Hand Loan') - Total Expense (category 'Hand Loan')
+    # Hand Loan stats
     if not df_tx.empty:
         handloan_income = df_tx[(df_tx['Category'] == 'Hand Loan') & (df_tx['Type'] == 'Income')]['Amount'].sum()
         handloan_expense = df_tx[(df_tx['Category'] == 'Hand Loan') & (df_tx['Type'] == 'Expense')]['Amount'].sum()
@@ -418,7 +447,9 @@ elif st.session_state.page == "➕ Add":
     emi_names = st.session_state.emi['Loan Name'].tolist() if not st.session_state.emi.empty else []
     goal_names = st.session_state.goals['Goal Name'].tolist() if not st.session_state.goals.empty else []
     
-    all_cats = list(set(['Transfer', 'Hand Loan'] + budget_cats + inv_names + emi_names + goal_names))
+    # Combine custom categories
+    custom_cats = st.session_state.custom_categories['Category'].tolist() if not st.session_state.custom_categories.empty else []
+    all_cats = list(set(['Transfer', 'Hand Loan'] + budget_cats + inv_names + emi_names + goal_names + custom_cats))
     all_cats = sorted(all_cats)
     
     if 'add_transaction_type' not in st.session_state:
@@ -433,8 +464,13 @@ elif st.session_state.page == "➕ Add":
         desc = st.text_input("Description")
         amount = st.number_input("Amount ₹", min_value=0.0)
     with col2:
-        type_options = ["Income", "Expense", "Investment", "Transfer", "BC"]
-        ttype = st.selectbox("Type", type_options, index=type_options.index(st.session_state.add_transaction_type) if st.session_state.add_transaction_type in type_options else 0, key='selected_type', on_change=on_type_change)
+        # Combine custom types with default ones
+        custom_type_names = st.session_state.custom_types['TypeName'].tolist() if not st.session_state.custom_types.empty else []
+        default_types = ["Income", "Expense", "Investment", "Transfer", "BC"]
+        all_types = list(set(default_types + custom_type_names))
+        all_types = sorted(all_types)
+        
+        ttype = st.selectbox("Type", all_types, index=all_types.index(st.session_state.add_transaction_type) if st.session_state.add_transaction_type in all_types else 0, key='selected_type', on_change=on_type_change)
         st.session_state.add_transaction_type = ttype
         
         category = None
@@ -583,7 +619,6 @@ elif st.session_state.page == "➕ Add":
                     st.session_state.budget.loc[cat_idx, 'Actual This Month'] = current_actual + amount
                     update_worksheet('Budget', st.session_state.budget)
             
-            st.cache_data.clear()
             st.success("✅ Transaction Saved Successfully! (Balances, Budget, EMI, Fuel, Investments updated)")
             st.rerun()
         except Exception as e:
@@ -655,7 +690,6 @@ elif st.session_state.page == "➕ Add":
             
             st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
             update_worksheet('Transactions', st.session_state.transactions)
-            st.cache_data.clear()
             st.success("✅ Transaction Deleted successfully! (All synced data reversed)")
             st.rerun()
     else:
@@ -787,7 +821,6 @@ elif st.session_state.page == "🏦 Bank":
                 st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                 append_to_worksheet('Transactions', new_row)
                 update_worksheet('Accounts', st.session_state.accounts)
-                st.cache_data.clear()
                 st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
                 st.rerun()
             else:
@@ -813,7 +846,6 @@ elif st.session_state.page == "🏦 Bank":
                     st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                     append_to_worksheet('Transactions', new_row)
                     update_worksheet('Accounts', st.session_state.accounts)
-                    st.cache_data.clear()
                     st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
                     st.rerun()
                 else:
@@ -852,7 +884,6 @@ elif st.session_state.page == "🏦 Bank":
                         st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                         append_to_worksheet('Transactions', new_row)
                         update_worksheet('Accounts', st.session_state.accounts)
-                        st.cache_data.clear()
                         st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
                         st.rerun()
                     else:
@@ -863,7 +894,7 @@ elif st.session_state.page == "🏦 Bank":
 # ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "📋 All Transactions"])
+    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "⚙️ Customization", "📋 All Transactions"])
     
     # ---------- Investments ----------
     with tabs[0]:
@@ -1010,8 +1041,71 @@ elif st.session_state.page == "⚡ More":
         else:
             st.info("Add some transactions to see detailed reports.")
     
-    # ---------- All Transactions ----------
+    # ---------- Customization ----------
     with tabs[4]:
+        st.markdown("### ⚙️ Custom Types & Categories")
+        st.info("Add your own Transaction Types (e.g., Hand Loan, Gift) and Categories (e.g., Medical, Travel). They will appear in the Add Transaction dropdowns.")
+        
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            st.markdown("#### 📌 Custom Types")
+            if not st.session_state.custom_types.empty:
+                st.dataframe(st.session_state.custom_types, hide_index=True, use_container_width=True)
+            else:
+                st.info("No custom types added yet.")
+            
+            with st.form("add_custom_type"):
+                type_name = st.text_input("Type Name")
+                type_nature = st.selectbox("Nature", ["Income", "Expense"])
+                if st.form_submit_button("Add Type"):
+                    if type_name:
+                        new_type = pd.DataFrame({'TypeName':[type_name], 'Nature':[type_nature]})
+                        st.session_state.custom_types = pd.concat([st.session_state.custom_types, new_type], ignore_index=True)
+                        update_worksheet('CustomTypes', st.session_state.custom_types)
+                        st.cache_data.clear()
+                        st.success(f"Type '{type_name}' added!")
+                        st.rerun()
+            
+            if not st.session_state.custom_types.empty:
+                type_to_del = st.selectbox("Delete a Custom Type", st.session_state.custom_types['TypeName'])
+                if st.button("🗑️ Delete Type"):
+                    idx = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == type_to_del].index[0]
+                    st.session_state.custom_types = st.session_state.custom_types.drop(idx).reset_index(drop=True)
+                    update_worksheet('CustomTypes', st.session_state.custom_types)
+                    st.cache_data.clear()
+                    st.success(f"Type '{type_to_del}' deleted!")
+                    st.rerun()
+        
+        with col_t2:
+            st.markdown("#### 🏷️ Custom Categories")
+            if not st.session_state.custom_categories.empty:
+                st.dataframe(st.session_state.custom_categories, hide_index=True, use_container_width=True)
+            else:
+                st.info("No custom categories added yet.")
+            
+            with st.form("add_custom_category"):
+                cat_name = st.text_input("Category Name")
+                if st.form_submit_button("Add Category"):
+                    if cat_name:
+                        new_cat = pd.DataFrame({'Category':[cat_name]})
+                        st.session_state.custom_categories = pd.concat([st.session_state.custom_categories, new_cat], ignore_index=True)
+                        update_worksheet('CustomCategories', st.session_state.custom_categories)
+                        st.cache_data.clear()
+                        st.success(f"Category '{cat_name}' added!")
+                        st.rerun()
+            
+            if not st.session_state.custom_categories.empty:
+                cat_to_del = st.selectbox("Delete a Custom Category", st.session_state.custom_categories['Category'])
+                if st.button("🗑️ Delete Category"):
+                    idx = st.session_state.custom_categories[st.session_state.custom_categories['Category'] == cat_to_del].index[0]
+                    st.session_state.custom_categories = st.session_state.custom_categories.drop(idx).reset_index(drop=True)
+                    update_worksheet('CustomCategories', st.session_state.custom_categories)
+                    st.cache_data.clear()
+                    st.success(f"Category '{cat_to_del}' deleted!")
+                    st.rerun()
+    
+    # ---------- All Transactions ----------
+    with tabs[5]:
         st.markdown("### 📋 All Transactions")
         df = st.session_state.transactions
         if not df.empty:
@@ -1029,6 +1123,7 @@ elif st.session_state.page == "⚡ More":
                     amount = tx['Amount']
                     payment_mode = tx['Payment Mode']
                     
+                    # Reverse budget, EMI, Investment, Fuel, Account Balance (same as before)
                     if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
                         cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                         st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
@@ -1076,7 +1171,6 @@ elif st.session_state.page == "⚡ More":
                     
                     st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
                     update_worksheet('Transactions', st.session_state.transactions)
-                    st.cache_data.clear()
                     st.success("✅ Transaction Deleted successfully!")
                     st.rerun()
         else:
