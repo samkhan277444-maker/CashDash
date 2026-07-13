@@ -568,7 +568,7 @@ elif st.session_state.page == "➕ Add":
                 st.session_state.accounts.loc[to_idx, 'Balance'] += amount
                 update_worksheet('Accounts', st.session_state.accounts)
             
-            # 2. Payment Mode Balance
+            # 2. Payment Mode Balance (non-transfer)
             else:
                 acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                 if not acc_idx.empty:
@@ -577,10 +577,8 @@ elif st.session_state.page == "➕ Add":
                         st.session_state.accounts.loc[idx, 'Balance'] += amount
                     elif nature in ["Expense", "BC"]:
                         st.session_state.accounts.loc[idx, 'Balance'] -= amount
-                    elif nature == "Expense" and ttype == "Investment":
-                        st.session_state.accounts.loc[idx, 'Balance'] -= amount
                     update_worksheet('Accounts', st.session_state.accounts)
-            
+
             # 3. EMI
             if is_emi and ttype == "Expense" and emi_loan and amount > 0:
                 emi_idx = st.session_state.emi[st.session_state.emi['Loan Name'] == emi_loan].index[0]
