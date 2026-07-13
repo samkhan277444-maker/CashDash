@@ -342,6 +342,14 @@ if st.session_state.page == "🏠 Home":
     # BC stats
     bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
 
+    # Hand Loan stats: Outstanding = Total Income (category 'Hand Loan') - Total Expense (category 'Hand Loan')
+    if not df_tx.empty:
+        handloan_income = df_tx[(df_tx['Category'] == 'Hand Loan') & (df_tx['Type'] == 'Income')]['Amount'].sum()
+        handloan_expense = df_tx[(df_tx['Category'] == 'Hand Loan') & (df_tx['Type'] == 'Expense')]['Amount'].sum()
+        handloan_outstanding = handloan_income - handloan_expense
+    else:
+        handloan_outstanding = 0
+
     # Row 1: Accounts
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -353,14 +361,14 @@ if st.session_state.page == "🏠 Home":
     with col4:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💵 Cash</div><div class='sheet-card-value'>{format_currency(cash_bal)}</div></div>", unsafe_allow_html=True)
 
-    # Row 2: Income, Expense, Savings, Budget
+    # Row 2: Income, Expense, Hand Loan, Budget
     col5, col6, col7, col8 = st.columns(4)
     with col5:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Income</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col6:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Total Expense</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(monthly_exp)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col7:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💎 Savings</div><div class='sheet-card-value' style='color:#f59e0b;'>{format_currency(savings)}</div><div class='sheet-card-sub'>{ f'{(savings/monthly_inc)*100:.0f}%' if monthly_inc>0 else '0%' }</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🤝 Hand Loan</div><div class='sheet-card-value' style='color:#8b5cf6;'>{format_currency(handloan_outstanding)}</div><div class='sheet-card-sub'>Outstanding</div></div>", unsafe_allow_html=True)
     with col8:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 This Month Budget</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
 
@@ -653,7 +661,7 @@ elif st.session_state.page == "➕ Add":
     else:
         st.info("No transactions available to delete.")
 
-# ===================== BUDGET (Actual This Month Removed from Manual Edit) =====================
+# ===================== BUDGET =====================
 elif st.session_state.page == "🎯 Budget":
     st.subheader("🎯 Budget Planner (Monthly)")
     
@@ -733,11 +741,9 @@ elif st.session_state.page == "🎯 Budget":
         
         curr = st.number_input("Current Month Budget ₹", min_value=0.0, step=100.0)
         prev = st.number_input("Previous Month Budget ₹", min_value=0.0, step=100.0)
-        # Actual This Month input is REMOVED
         
         if st.button("Save / Update Budget"):
             if new_cat:
-                # When adding new category, Actual This Month should be 0 (will be updated by transactions)
                 new_row = pd.DataFrame({
                     'Category': [new_cat],
                     'Current Month Budget': [curr],
@@ -750,7 +756,6 @@ elif st.session_state.page == "🎯 Budget":
                 if not idx.empty:
                     st.session_state.budget.loc[idx, 'Current Month Budget'] = curr
                     st.session_state.budget.loc[idx, 'Previous Month Budget'] = prev
-                    # Actual This Month remains unchanged (auto-updated)
             update_worksheet('Budget', st.session_state.budget)
             st.cache_data.clear()
             st.success("Budget Updated!")
@@ -1024,7 +1029,6 @@ elif st.session_state.page == "⚡ More":
                     amount = tx['Amount']
                     payment_mode = tx['Payment Mode']
                     
-                    # Reverse logic same as before
                     if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
                         cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                         st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
