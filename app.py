@@ -643,7 +643,7 @@ elif st.session_state.page == "➕ Add":
             st.success(success_msg)
         if error_msg:
             st.error(error_msg)
-        st.rerun()
+        st.rerun()  # 🔥 Refresh dashboard immediately
 
     st.markdown("---")
     st.markdown("### 🗑️ Delete a Transaction")
@@ -733,7 +733,7 @@ elif st.session_state.page == "➕ Add":
                 st.success(success_msg)
             if error_msg:
                 st.error(error_msg)
-            st.rerun()
+            st.rerun()  # 🔥 Refresh dashboard immediately
     else:
         st.info("No transactions available to delete.")
 
