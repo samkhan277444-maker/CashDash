@@ -401,28 +401,24 @@ if st.session_state.page == "🏠 Home":
     with col_sync2:
         st.markdown(f"<div style='text-align:right; font-size:0.7rem; color:#94a3b8;'>Last synced: {st.session_state.last_sync_time}</div>", unsafe_allow_html=True)
 
-# ===================== ADD TRANSACTION (WITH CATEGORY HIDE FOR INCOME) =====================
+# ===================== ADD TRANSACTION =====================
 elif st.session_state.page == "➕ Add":
     st.subheader("➕ Add Transaction")
     
-    # Prepare dynamic categories
     budget_cats = st.session_state.budget['Category'].tolist()
     inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
     emi_names = st.session_state.emi['Loan Name'].tolist() if not st.session_state.emi.empty else []
     goal_names = st.session_state.goals['Goal Name'].tolist() if not st.session_state.goals.empty else []
+    
     all_cats = list(set(['Transfer', 'Hand Loan'] + budget_cats + inv_names + emi_names + goal_names))
     all_cats = sorted(all_cats)
     
-    # Use session state to store current type and trigger rerun on change
     if 'add_transaction_type' not in st.session_state:
         st.session_state.add_transaction_type = st.session_state.get('add_type', 'Income')
     
-    # Define on_change callback
     def on_type_change():
         st.session_state.add_transaction_type = st.session_state.selected_type
-        # No need to rerun here, Streamlit will rerun automatically
     
-    # Widgets
     col1, col2 = st.columns(2)
     with col1:
         date = st.date_input("Date", datetime.now())
@@ -430,18 +426,14 @@ elif st.session_state.page == "➕ Add":
         amount = st.number_input("Amount ₹", min_value=0.0)
     with col2:
         type_options = ["Income", "Expense", "Investment", "Transfer", "BC"]
-        # Use selectbox with on_change to update session state
         ttype = st.selectbox("Type", type_options, index=type_options.index(st.session_state.add_transaction_type) if st.session_state.add_transaction_type in type_options else 0, key='selected_type', on_change=on_type_change)
-        # Update session state manually
         st.session_state.add_transaction_type = ttype
         
-        # Category: show only if not Income
         category = None
         if ttype != "Income":
             category = st.selectbox("Category", all_cats)
         else:
-            # For Income, auto-set category to "Salary" and hide the selectbox
-            category = "Salary"  # default
+            category = "Salary"
             st.text("Category: Salary (auto-set for Income)")
         
         payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
@@ -498,7 +490,6 @@ elif st.session_state.page == "➕ Add":
             else:
                 desc = f"Fuel - {f_litres:.1f} L"
     
-    # Submit button
     if st.button("✅ Add Transaction", key="submit_btn"):
         try:
             new_row = [date.strftime('%Y-%m-%d'), desc, category, amount, ttype, payment_mode, '✅']
@@ -662,7 +653,7 @@ elif st.session_state.page == "➕ Add":
     else:
         st.info("No transactions available to delete.")
 
-# ===================== BUDGET =====================
+# ===================== BUDGET (Actual This Month Removed from Manual Edit) =====================
 elif st.session_state.page == "🎯 Budget":
     st.subheader("🎯 Budget Planner (Monthly)")
     
@@ -721,7 +712,7 @@ elif st.session_state.page == "🎯 Budget":
         'Actual This Month': '₹ {:.0f}', 'Diff': '₹ {:.0f}', 'Progress': '{:.1f}%'
     }), use_container_width=True, hide_index=True)
 
-    with st.expander("✏️ Add / Edit / Delete Budget Category"):
+    with st.expander("✏️ Add / Edit Budget Category"):
         st.markdown("#### 🗑️ Delete a Category")
         if not df.empty:
             del_cat = st.selectbox("Select category to delete", df['Category'])
@@ -736,22 +727,30 @@ elif st.session_state.page == "🎯 Budget":
             st.info("No categories to delete.")
 
         st.markdown("---")
+        st.markdown("### ✏️ Edit Category (Actual This Month auto-updates from Transactions)")
         new_cat = st.text_input("New Category Name (Leave blank to edit existing)")
         sel_cat = st.selectbox("Or select existing to edit", df['Category'].tolist() + ["New"])
+        
         curr = st.number_input("Current Month Budget ₹", min_value=0.0, step=100.0)
         prev = st.number_input("Previous Month Budget ₹", min_value=0.0, step=100.0)
-        actual = st.number_input("Actual This Month ₹", min_value=0.0, step=100.0)
+        # Actual This Month input is REMOVED
         
         if st.button("Save / Update Budget"):
             if new_cat:
-                new_row = pd.DataFrame({'Category':[new_cat], 'Current Month Budget':[curr], 'Previous Month Budget':[prev], 'Actual This Month':[actual]})
+                # When adding new category, Actual This Month should be 0 (will be updated by transactions)
+                new_row = pd.DataFrame({
+                    'Category': [new_cat],
+                    'Current Month Budget': [curr],
+                    'Previous Month Budget': [prev],
+                    'Actual This Month': [0.0]
+                })
                 st.session_state.budget = pd.concat([st.session_state.budget, new_row], ignore_index=True)
             else:
                 idx = df[df['Category'] == sel_cat].index
                 if not idx.empty:
                     st.session_state.budget.loc[idx, 'Current Month Budget'] = curr
                     st.session_state.budget.loc[idx, 'Previous Month Budget'] = prev
-                    st.session_state.budget.loc[idx, 'Actual This Month'] = actual
+                    # Actual This Month remains unchanged (auto-updated)
             update_worksheet('Budget', st.session_state.budget)
             st.cache_data.clear()
             st.success("Budget Updated!")
