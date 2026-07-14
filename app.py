@@ -325,7 +325,7 @@ def force_sync():
 st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
 
-# 🛠️ FIX: Radio button ka key set kiya taaki hum ise control kar sakein
+# Radio Navigation
 nav = st.radio("Menu", ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"], index=0, horizontal=True, key='nav_radio')
 st.session_state.page = nav
 
@@ -647,8 +647,13 @@ elif st.session_state.page == "➕ Add":
         if error_msg:
             st.error(error_msg)
         
-        # 🛠️ FIX: Radio button ko Home par set karo, phir refresh karo
-        st.session_state['nav_radio'] = "🏠 Home"
+        # 🔥 FIX: Safe Radio Navigation + Cache Clear
+        try:
+            st.session_state['nav_radio'] = "🏠 Home"
+        except:
+            pass
+        st.session_state.page = "🏠 Home"
+        st.cache_data.clear()
         st.rerun()
 
     st.markdown("---")
@@ -740,8 +745,13 @@ elif st.session_state.page == "➕ Add":
             if error_msg:
                 st.error(error_msg)
             
-            # 🛠️ FIX: Radio button ko Home par set karo, phir refresh karo
-            st.session_state['nav_radio'] = "🏠 Home"
+            # 🔥 FIX: Safe Radio Navigation + Cache Clear
+            try:
+                st.session_state['nav_radio'] = "🏠 Home"
+            except:
+                pass
+            st.session_state.page = "🏠 Home"
+            st.cache_data.clear()
             st.rerun()
     else:
         st.info("No transactions available to delete.")
@@ -873,7 +883,13 @@ elif st.session_state.page == "🏦 Bank":
                 append_to_worksheet('Transactions', new_row)
                 update_worksheet('Accounts', st.session_state.accounts)
                 st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
-                st.session_state['nav_radio'] = "🏠 Home"
+                
+                try:
+                    st.session_state['nav_radio'] = "🏠 Home"
+                except:
+                    pass
+                st.session_state.page = "🏠 Home"
+                st.cache_data.clear()
                 st.rerun()
             else:
                 st.error("Amount must be greater than 0.")
@@ -899,7 +915,13 @@ elif st.session_state.page == "🏦 Bank":
                     append_to_worksheet('Transactions', new_row)
                     update_worksheet('Accounts', st.session_state.accounts)
                     st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
-                    st.session_state['nav_radio'] = "🏠 Home"
+                    
+                    try:
+                        st.session_state['nav_radio'] = "🏠 Home"
+                    except:
+                        pass
+                    st.session_state.page = "🏠 Home"
+                    st.cache_data.clear()
                     st.rerun()
                 else:
                     st.error("❌ Insufficient balance!")
@@ -938,7 +960,13 @@ elif st.session_state.page == "🏦 Bank":
                         append_to_worksheet('Transactions', new_row)
                         update_worksheet('Accounts', st.session_state.accounts)
                         st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
-                        st.session_state['nav_radio'] = "🏠 Home"
+                        
+                        try:
+                            st.session_state['nav_radio'] = "🏠 Home"
+                        except:
+                            pass
+                        st.session_state.page = "🏠 Home"
+                        st.cache_data.clear()
                         st.rerun()
                     else:
                         st.error("❌ Insufficient balance in source account!")
@@ -950,12 +978,16 @@ elif st.session_state.page == "🏦 Bank":
     with st.expander("⚠️ Reset All Account Balances to Zero"):
         st.error("This will set all bank, wallet, and cash balances to ₹0. This action cannot be undone.")
         if st.button("✅ Yes, Reset All Balances to ₹0", key="reset_balances_btn"):
-            # Set all balances to 0.0 directly
             st.session_state.accounts['Balance'] = 0.0
             update_worksheet('Accounts', st.session_state.accounts)
             st.cache_data.clear()
             st.success("✅ All account balances reset to ₹0!")
-            st.session_state['nav_radio'] = "🏠 Home"
+            
+            try:
+                st.session_state['nav_radio'] = "🏠 Home"
+            except:
+                pass
+            st.session_state.page = "🏠 Home"
             st.rerun()
 
 # ===================== MORE (Premium Modules) =====================
@@ -1296,7 +1328,13 @@ elif st.session_state.page == "⚡ More":
                         st.success(success_msg)
                     if error_msg:
                         st.error(error_msg)
-                    st.session_state['nav_radio'] = "🏠 Home"
+                    
+                    try:
+                        st.session_state['nav_radio'] = "🏠 Home"
+                    except:
+                        pass
+                    st.session_state.page = "🏠 Home"
+                    st.cache_data.clear()
                     st.rerun()
         else:
             st.info("No transactions yet.")
