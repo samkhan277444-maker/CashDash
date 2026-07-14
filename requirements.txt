@@ -1,7 +1,10 @@
 streamlit
 pandas
+numpy
 plotly
 gspread
 google-auth
 pdfplumber
+schedule
 streamlit-mic-recorder
+requests
