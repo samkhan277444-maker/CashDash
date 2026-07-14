@@ -10,7 +10,15 @@ from google.oauth2.service_account import Credentials
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
-
+# ---------- PWA INJECTION ----------
+st.markdown("""
+<link rel="manifest" href="YOUR_MANIFEST_RAW_URL">
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('YOUR_SERVICE_WORKER_RAW_URL');
+}
+</script>
+""", unsafe_allow_html=True)
 # ---------- MOBILE-OPTIMIZED CSS ----------
 st.markdown("""
 <style>
