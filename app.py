@@ -4,56 +4,78 @@ import numpy as np
 import plotly.express as px
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import gspread
 from google.oauth2.service_account import Credentials
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- MOBILE-OPTIMIZED CSS ----------
-st.markdown("""
+# ---------- THEME TOGGLE (Dark/Light) ----------
+if 'dark_theme' not in st.session_state:
+    st.session_state.dark_theme = True
+
+def toggle_theme():
+    st.session_state.dark_theme = not st.session_state.dark_theme
+
+# ---------- CSS (Neumorphic + Theme Support) ----------
+theme_css = """
 <style>
-    .stApp { background-color: #f1f3f6; color: #1e293b; }
+    .stApp {
+        background-color: {bg_color};
+        color: {text_color};
+    }
     .sheet-card {
-        background: #ffffff;
-        border-radius: 8px;
-        padding: 8px 10px;
-        margin-bottom: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        border: 1px solid #e2e8f0;
+        background: {card_bg};
+        border-radius: 16px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        box-shadow: {card_shadow};
+        border: 1px solid {card_border};
         text-align: center;
-        min-width: 80px;
+        transition: all 0.3s ease;
+    }
+    .sheet-card:hover {
+        transform: translateY(-2px);
+        box-shadow: {card_shadow_hover};
     }
     .sheet-card-header {
-        color: #64748b;
-        font-size: 0.65rem;
+        color: {sub_text};
+        font-size: 0.7rem;
         font-weight: 600;
-        margin-bottom: 2px;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     .sheet-card-value {
-        font-size: 1.2rem;
+        font-size: 1.4rem;
         font-weight: 700;
-        color: #0f172a;
+        color: {primary_color};
     }
     .sheet-card-sub {
         font-size: 0.55rem;
-        color: #94a3b8;
-        margin-top: 2px;
+        color: {sub_text};
+        margin-top: 4px;
     }
     .stButton button {
         width: 100%;
-        border-radius: 6px;
+        border-radius: 12px;
         font-weight: 600;
         border: none;
-        font-size: 0.85rem;
+        background: {primary_color};
+        color: white;
+        padding: 10px 0;
+        transition: 0.3s;
+    }
+    .stButton button:hover {
+        background: {primary_hover};
+        transform: scale(1.02);
     }
     .stDataFrame { font-size: 0.8rem; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
-    
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    /* Mobile optimizations */
     @media (max-width: 768px) {
-        .sheet-card { min-width: 60px; padding: 6px; }
+        .sheet-card { padding: 8px 10px; min-width: 60px; }
         .sheet-card-value { font-size: 1rem; }
         .stColumns { flex-wrap: wrap !important; }
         .stColumn { flex: 1 1 45% !important; min-width: 60px; }
@@ -62,7 +84,32 @@ st.markdown("""
         .stColumn { flex: 1 1 100% !important; }
     }
 </style>
-""", unsafe_allow_html=True)
+"""
+if st.session_state.dark_theme:
+    css = theme_css.format(
+        bg_color="#0e1117",
+        text_color="#f0f2f6",
+        card_bg="#1e2630",
+        card_shadow="0 6px 12px rgba(0,0,0,0.4)",
+        card_shadow_hover="0 10px 20px rgba(0,0,0,0.6)",
+        card_border="#2c3e50",
+        sub_text="#94a3b8",
+        primary_color="#00d4ff",
+        primary_hover="#00b0d4"
+    )
+else:
+    css = theme_css.format(
+        bg_color="#f1f3f6",
+        text_color="#1e293b",
+        card_bg="#ffffff",
+        card_shadow="0 4px 12px rgba(0,0,0,0.05)",
+        card_shadow_hover="0 8px 24px rgba(0,0,0,0.08)",
+        card_border="#e2e8f0",
+        sub_text="#64748b",
+        primary_color="#2563eb",
+        primary_hover="#1d4ed8"
+    )
+st.markdown(css, unsafe_allow_html=True)
 
 # ---------- GOOGLE SHEET CONNECTION ----------
 SHEET_NAME = "CashDash" 
@@ -91,7 +138,7 @@ def load_all_sheets():
     
     data = {}
     worksheet_names = ['Transactions', 'Budget', 'Accounts', 'Investments', 'EmiManager', 
-                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories', 'CustomNatures']
+                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories', 'CustomNatures', 'Recurring']
     
     try:
         sh = gc.open(SHEET_NAME)
@@ -167,6 +214,74 @@ def update_settings(key, value):
     except Exception as e:
         st.warning(f"Could not update settings: {e}")
 
+# ---------- RECURRING TRANSACTIONS PROCESSING ----------
+def process_recurring():
+    """Check if any recurring transaction is due today and add it."""
+    recurring_df = st.session_state.get('recurring', pd.DataFrame())
+    if recurring_df.empty:
+        return
+    today = datetime.now().date()
+    for idx, row in recurring_df.iterrows():
+        next_date = pd.to_datetime(row['NextDate']).date()
+        if next_date <= today:
+            # Add transaction
+            new_row = [today.strftime('%Y-%m-%d'), row['Description'], row['Category'], 
+                       row['Amount'], row['Type'], row['Payment Mode'], '✅']
+            st.session_state.transactions = pd.concat([st.session_state.transactions, 
+                pd.DataFrame([{
+                    'Date': today.strftime('%Y-%m-%d'),
+                    'Description': row['Description'],
+                    'Category': row['Category'],
+                    'Amount': row['Amount'],
+                    'Type': row['Type'],
+                    'Payment Mode': row['Payment Mode'],
+                    'Status': '✅'
+                }])], ignore_index=True)
+            append_to_worksheet('Transactions', new_row)
+            # Update next date based on frequency
+            freq = row['Frequency']
+            if freq == 'Daily':
+                next_date = today + timedelta(days=1)
+            elif freq == 'Weekly':
+                next_date = today + timedelta(days=7)
+            elif freq == 'Monthly':
+                next_date = today + timedelta(days=30)
+            elif freq == 'Yearly':
+                next_date = today + timedelta(days=365)
+            else:
+                next_date = today + timedelta(days=30)  # default
+            # Update recurring sheet
+            recurring_df.at[idx, 'NextDate'] = next_date.strftime('%Y-%m-%d')
+    update_worksheet('Recurring', recurring_df)
+    st.session_state.recurring = recurring_df
+
+# ---------- AI CATEGORIZATION (Simple Keyword Mapping) ----------
+AI_CATEGORY_MAP = {
+    'zomato': 'Food',
+    'swiggy': 'Food',
+    'uber': 'Transport',
+    'ola': 'Transport',
+    'amazon': 'Shopping',
+    'flipkart': 'Shopping',
+    'netflix': 'Entertainment',
+    'spotify': 'Entertainment',
+    'rent': 'Rent',
+    'salary': 'Salary',
+    'emi': 'EMI',
+    'fuel': 'Fuel',
+    'groceries': 'Groceries',
+    'vegetables': 'Vegetables',
+    'mobile': 'Mobile Recharge',
+    'electricity': 'Utilities',
+    'water': 'Utilities',
+}
+def ai_categorize(desc):
+    desc_lower = desc.lower()
+    for keyword, category in AI_CATEGORY_MAP.items():
+        if keyword in desc_lower:
+            return category
+    return 'Others'
+
 # ---------- SESSION STATE ----------
 def init_session_state():
     all_data = load_all_sheets()
@@ -205,7 +320,6 @@ def init_session_state():
     loaded = all_data.get('Investments', pd.DataFrame())
     if not loaded.empty and 'Name' in loaded.columns:
         loaded = loaded[loaded['Name'].notna() & (loaded['Name'].astype(str).str.strip() != '')]
-    
     req_inv_cols = ['Name','Type','Amount','Frequency','Total Invested','Current Value']
     if loaded.empty or not all(c in loaded.columns for c in req_inv_cols):
         st.session_state.investments = pd.DataFrame(columns=req_inv_cols)
@@ -246,7 +360,6 @@ def init_session_state():
                 st.session_state.master_budget = 0.0
         else:
             st.session_state.master_budget = 0.0
-        
         if 'last_sync_time' in loaded['Key'].values:
             st.session_state.last_sync_time = loaded[loaded['Key']=='last_sync_time']['Value'].values[0]
         else:
@@ -272,6 +385,16 @@ def init_session_state():
         st.session_state.custom_natures = pd.DataFrame({'Nature': ['Income', 'Expense']})
     else:
         st.session_state.custom_natures = loaded
+
+    # 12. Recurring
+    loaded = all_data.get('Recurring', pd.DataFrame())
+    if loaded.empty:
+        st.session_state.recurring = pd.DataFrame(columns=['Description','Category','Amount','Type','Payment Mode','Frequency','NextDate'])
+    else:
+        st.session_state.recurring = loaded
+
+    # Process recurring transactions
+    process_recurring()
 
 if 'initialized' not in st.session_state:
     init_session_state()
@@ -311,6 +434,7 @@ def force_sync():
         update_worksheet('CustomTypes', st.session_state.custom_types)
         update_worksheet('CustomCategories', st.session_state.custom_categories)
         update_worksheet('CustomNatures', st.session_state.custom_natures)
+        update_worksheet('Recurring', st.session_state.recurring)
         
         sync_time = datetime.now().strftime("%d %b %Y, %H:%M:%S")
         update_settings('last_sync_time', sync_time)
@@ -321,9 +445,24 @@ def force_sync():
     except Exception as e:
         return False, f"❌ Sync failed: {e}"
 
+# ---------- EXPORT CSV ----------
+def export_transactions_csv():
+    df = st.session_state.transactions
+    if df.empty:
+        return None
+    csv = df.to_csv(index=False).encode('utf-8')
+    return csv
+
 # ---------- APP UI ----------
 st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
+
+# Theme Toggle
+col_toggle, _ = st.columns([1, 4])
+with col_toggle:
+    if st.button("🌓 Toggle Theme", key="theme_toggle"):
+        toggle_theme()
+        st.rerun()
 
 # Radio Navigation with proper state management
 nav = st.radio(
@@ -333,7 +472,6 @@ nav = st.radio(
     horizontal=True,
     key='nav_radio'
 )
-# Update page based on radio selection
 if nav != st.session_state.page:
     st.session_state.page = nav
 
@@ -383,10 +521,10 @@ if st.session_state.page == "🏠 Home":
     # BC stats
     bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
 
-    # Hand Loan stats
+    # Hand Loan stats (using custom type: we will treat any transaction with Type "Hand Loan" as outstanding)
     if not df_tx.empty:
-        handloan_income = df_tx[(df_tx['Category'] == 'Hand Loan') & (df_tx['Type'] == 'Income')]['Amount'].sum()
-        handloan_expense = df_tx[(df_tx['Category'] == 'Hand Loan') & (df_tx['Type'] == 'Expense')]['Amount'].sum()
+        handloan_income = df_tx[(df_tx['Type'] == 'Hand Loan') & (df_tx['Type'] == 'Income')]['Amount'].sum()
+        handloan_expense = df_tx[(df_tx['Type'] == 'Hand Loan') & (df_tx['Type'] == 'Expense')]['Amount'].sum()
         handloan_outstanding = handloan_income - handloan_expense
     else:
         handloan_outstanding = 0
@@ -449,11 +587,6 @@ if st.session_state.page == "🏠 Home":
                 st.error(msg)
     with col_sync2:
         st.markdown(f"<div style='text-align:right; font-size:0.7rem; color:#94a3b8;'>Last synced: {st.session_state.last_sync_time}</div>", unsafe_allow_html=True)
-
-    # 🔍 DEBUG SECTION (Add this to see if balance updates in session state)
-    with st.expander("🔍 Debug: Current Accounts Balances"):
-        st.write("This shows the actual data in session_state.accounts after every transaction.")
-        st.dataframe(st.session_state.accounts)
 
 # ===================== ADD TRANSACTION =====================
 elif st.session_state.page == "➕ Add":
@@ -563,6 +696,13 @@ elif st.session_state.page == "➕ Add":
                 desc = f"Fuel - {f_litres:.1f} L, {f_dist:.1f} km"
             else:
                 desc = f"Fuel - {f_litres:.1f} L"
+    
+    # AI Categorization: if description is entered and category is empty, suggest
+    if desc and not category:
+        suggested = ai_categorize(desc)
+        if suggested != 'Others':
+            st.info(f"🤖 Suggested category: {suggested}")
+            # We can auto-select but we leave user to choose.
     
     if st.button("✅ Add Transaction", key="submit_btn"):
         success_msg = None
@@ -982,7 +1122,7 @@ elif st.session_state.page == "🏦 Bank":
 # ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "⚙️ Customization", "📋 All Transactions"])
+    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "⚙️ Customization", "📋 All Transactions", "🔄 Recurring"])
     
     # ---------- Investments ----------
     with tabs[0]:
@@ -1062,7 +1202,7 @@ elif st.session_state.page == "⚡ More":
                 st.success("Goal Deleted!")
                 st.rerun()
     
-    # ---------- Reports ----------
+    # ---------- Reports (with Export CSV) ----------
     with tabs[3]:
         st.markdown("### 📊 Monthly Analysis")
         df = st.session_state.transactions
@@ -1126,6 +1266,19 @@ elif st.session_state.page == "⚡ More":
                 fig6 = px.bar(bc_monthly, x='Month', y='Amount', title="💳 BC (Bachat Gat) Per Month", color_discrete_sequence=['#3b82f6'])
                 fig6.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig6, use_container_width=True)
+            
+            # Export CSV Button
+            st.markdown("### 📥 Export Data")
+            csv_data = export_transactions_csv()
+            if csv_data:
+                st.download_button(
+                    label="📥 Download Transactions as CSV",
+                    data=csv_data,
+                    file_name=f"transactions_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("No transactions to export.")
         else:
             st.info("Add some transactions to see detailed reports.")
     
@@ -1323,3 +1476,47 @@ elif st.session_state.page == "⚡ More":
                     st.rerun()
         else:
             st.info("No transactions yet.")
+    
+    # ---------- Recurring Transactions ----------
+    with tabs[6]:
+        st.markdown("### 🔄 Recurring Transactions")
+        st.info("Add transactions that repeat daily, weekly, or monthly. They will be auto-added on their due date.")
+        
+        recurring_df = st.session_state.recurring
+        st.dataframe(recurring_df, hide_index=True, use_container_width=True)
+        
+        with st.form("add_recurring"):
+            col1, col2 = st.columns(2)
+            with col1:
+                desc = st.text_input("Description")
+                amount = st.number_input("Amount ₹", min_value=0.0)
+                next_date = st.date_input("Next Due Date", datetime.now())
+            with col2:
+                freq = st.selectbox("Frequency", ["Daily", "Weekly", "Monthly", "Yearly"])
+                cat = st.selectbox("Category", all_cats)
+                ttype = st.selectbox("Type", all_types)
+                payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+            if st.form_submit_button("Add Recurring"):
+                new_row = pd.DataFrame([{
+                    'Description': desc,
+                    'Category': cat,
+                    'Amount': amount,
+                    'Type': ttype,
+                    'Payment Mode': payment_mode,
+                    'Frequency': freq,
+                    'NextDate': next_date.strftime('%Y-%m-%d')
+                }])
+                st.session_state.recurring = pd.concat([st.session_state.recurring, new_row], ignore_index=True)
+                update_worksheet('Recurring', st.session_state.recurring)
+                st.cache_data.clear()
+                st.success("Recurring transaction added!")
+                st.rerun()
+        
+        if not recurring_df.empty:
+            if st.button("🗑️ Delete Selected Recurring"):
+                idx = st.selectbox("Select recurring to delete", range(len(recurring_df)), format_func=lambda i: recurring_df.iloc[i]['Description'] + " - " + recurring_df.iloc[i]['NextDate'])
+                st.session_state.recurring = recurring_df.drop(idx).reset_index(drop=True)
+                update_worksheet('Recurring', st.session_state.recurring)
+                st.cache_data.clear()
+                st.success("Recurring deleted!")
+                st.rerun()
