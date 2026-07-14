@@ -485,6 +485,9 @@ elif st.session_state.page == "➕ Add":
         if ttype in st.session_state.custom_types['TypeName'].values:
             custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
         nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+        # 🔥 Safeguard: if nature is None or Neutral, treat as Income (or fallback)
+        if nature is None or nature == "Neutral":
+            nature = "Income"   # fallback to avoid no update
         st.text(f"Nature: {nature} (auto-assigned)")
         
         category = None
@@ -568,7 +571,7 @@ elif st.session_state.page == "➕ Add":
                 st.session_state.accounts.loc[to_idx, 'Balance'] += amount
                 update_worksheet('Accounts', st.session_state.accounts)
             
-            # 2. Payment Mode Balance (non-transfer)
+            # 2. Payment Mode Balance (non-transfer) - FIXED
             else:
                 acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                 if not acc_idx.empty:
@@ -643,7 +646,10 @@ elif st.session_state.page == "➕ Add":
             st.success(success_msg)
         if error_msg:
             st.error(error_msg)
-        st.rerun()  # 🔥 Refresh dashboard immediately
+        
+        # 🔥 FORCE DASHBOARD REFRESH WITH HOME PAGE REDIRECT
+        st.session_state.page = "🏠 Home"
+        st.rerun()
 
     st.markdown("---")
     st.markdown("### 🗑️ Delete a Transaction")
@@ -733,7 +739,8 @@ elif st.session_state.page == "➕ Add":
                 st.success(success_msg)
             if error_msg:
                 st.error(error_msg)
-            st.rerun()  # 🔥 Refresh dashboard immediately
+            st.session_state.page = "🏠 Home"
+            st.rerun()
     else:
         st.info("No transactions available to delete.")
 
@@ -864,6 +871,7 @@ elif st.session_state.page == "🏦 Bank":
                 append_to_worksheet('Transactions', new_row)
                 update_worksheet('Accounts', st.session_state.accounts)
                 st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
+                st.session_state.page = "🏠 Home"
                 st.rerun()
             else:
                 st.error("Amount must be greater than 0.")
@@ -889,6 +897,7 @@ elif st.session_state.page == "🏦 Bank":
                     append_to_worksheet('Transactions', new_row)
                     update_worksheet('Accounts', st.session_state.accounts)
                     st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
+                    st.session_state.page = "🏠 Home"
                     st.rerun()
                 else:
                     st.error("❌ Insufficient balance!")
@@ -927,6 +936,7 @@ elif st.session_state.page == "🏦 Bank":
                         append_to_worksheet('Transactions', new_row)
                         update_worksheet('Accounts', st.session_state.accounts)
                         st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
+                        st.session_state.page = "🏠 Home"
                         st.rerun()
                     else:
                         st.error("❌ Insufficient balance in source account!")
@@ -1283,6 +1293,7 @@ elif st.session_state.page == "⚡ More":
                         st.success(success_msg)
                     if error_msg:
                         st.error(error_msg)
+                    st.session_state.page = "🏠 Home"
                     st.rerun()
         else:
             st.info("No transactions yet.")
