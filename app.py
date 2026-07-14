@@ -18,14 +18,14 @@ if 'dark_theme' not in st.session_state:
 def toggle_theme():
     st.session_state.dark_theme = not st.session_state.dark_theme
 
-# ---------- CSS (Neumorphic + Theme Support) ----------
+# ---------- CSS (Neumorphic + Theme Support) FIXED ----------
 theme_css = """
 <style>
-    .stApp {
+    .stApp {{
         background-color: {bg_color};
         color: {text_color};
-    }
-    .sheet-card {
+    }}
+    .sheet-card {{
         background: {card_bg};
         border-radius: 16px;
         padding: 12px 16px;
@@ -34,29 +34,29 @@ theme_css = """
         border: 1px solid {card_border};
         text-align: center;
         transition: all 0.3s ease;
-    }
-    .sheet-card:hover {
+    }}
+    .sheet-card:hover {{
         transform: translateY(-2px);
         box-shadow: {card_shadow_hover};
-    }
-    .sheet-card-header {
+    }}
+    .sheet-card-header {{
         color: {sub_text};
         font-size: 0.7rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-    }
-    .sheet-card-value {
+    }}
+    .sheet-card-value {{
         font-size: 1.4rem;
         font-weight: 700;
         color: {primary_color};
-    }
-    .sheet-card-sub {
+    }}
+    .sheet-card-sub {{
         font-size: 0.55rem;
         color: {sub_text};
         margin-top: 4px;
-    }
-    .stButton button {
+    }}
+    .stButton button {{
         width: 100%;
         border-radius: 12px;
         font-weight: 600;
@@ -65,24 +65,24 @@ theme_css = """
         color: white;
         padding: 10px 0;
         transition: 0.3s;
-    }
-    .stButton button:hover {
+    }}
+    .stButton button:hover {{
         background: {primary_hover};
         transform: scale(1.02);
-    }
-    .stDataFrame { font-size: 0.8rem; }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    }}
+    .stDataFrame {{ font-size: 0.8rem; }}
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
     /* Mobile optimizations */
-    @media (max-width: 768px) {
-        .sheet-card { padding: 8px 10px; min-width: 60px; }
-        .sheet-card-value { font-size: 1rem; }
-        .stColumns { flex-wrap: wrap !important; }
-        .stColumn { flex: 1 1 45% !important; min-width: 60px; }
-    }
-    @media (max-width: 480px) {
-        .stColumn { flex: 1 1 100% !important; }
-    }
+    @media (max-width: 768px) {{
+        .sheet-card {{ padding: 8px 10px; min-width: 60px; }}
+        .sheet-card-value {{ font-size: 1rem; }}
+        .stColumns {{ flex-wrap: wrap !important; }}
+        .stColumn {{ flex: 1 1 45% !important; min-width: 60px; }}
+    }}
+    @media (max-width: 480px) {{
+        .stColumn {{ flex: 1 1 100% !important; }}
+    }}
 </style>
 """
 if st.session_state.dark_theme:
