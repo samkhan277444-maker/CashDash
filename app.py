@@ -10,26 +10,7 @@ from google.oauth2.service_account import Credentials
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
-# ---------- PWA INJECTION ----------
-st.markdown("""
-<link rel="manifest" href="https://gist.githubusercontent.com/samkhan277444-maker/102996dff4fc81180ec44561deb2bb0b/raw/0ed6378bbacd92448586806fc0ea361d5c0e86f1/manifest.json">
-<script>
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('https://gist.githubusercontent.com/samkhan277444-maker/102996dff4fc81180ec44561deb2bb0b/raw/0ed6378bbacd92448586806fc0ea361d5c0e86f1/gistfile1.txt
 
-');
-}
-</script>
-""", unsafe_allow_html=True)
-# ---------- PWA INJECTION ----------
-st.markdown("""
-<link rel="manifest" href="YOUR_MANIFEST_RAW_URL">
-<script>
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('YOUR_SERVICE_WORKER_RAW_URL');
-}
-</script>
-""", unsafe_allow_html=True)
 # ---------- MOBILE-OPTIMIZED CSS ----------
 st.markdown("""
 <style>
@@ -344,7 +325,7 @@ def force_sync():
 st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
 
-# 🛠️ FIX: Radio button safely reads from st.session_state.page
+# Radio Navigation with proper state management
 nav = st.radio(
     "Menu",
     ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"],
@@ -352,7 +333,7 @@ nav = st.radio(
     horizontal=True,
     key='nav_radio'
 )
-# Only update page if navigation changed
+# Update page based on radio selection
 if nav != st.session_state.page:
     st.session_state.page = nav
 
@@ -468,6 +449,11 @@ if st.session_state.page == "🏠 Home":
                 st.error(msg)
     with col_sync2:
         st.markdown(f"<div style='text-align:right; font-size:0.7rem; color:#94a3b8;'>Last synced: {st.session_state.last_sync_time}</div>", unsafe_allow_html=True)
+
+    # 🔍 DEBUG SECTION (Add this to see if balance updates in session state)
+    with st.expander("🔍 Debug: Current Accounts Balances"):
+        st.write("This shows the actual data in session_state.accounts after every transaction.")
+        st.dataframe(st.session_state.accounts)
 
 # ===================== ADD TRANSACTION =====================
 elif st.session_state.page == "➕ Add":
