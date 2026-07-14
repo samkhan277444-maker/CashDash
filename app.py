@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 import json
 import re
 from datetime import datetime, timedelta
@@ -12,62 +11,49 @@ from google.oauth2.service_account import Credentials
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- THEME TOGGLE ----------
-if 'theme' not in st.session_state:
-    st.session_state.theme = 'dark'
+# ---------- THEME TOGGLE (Dark/Light) ----------
+if 'dark_theme' not in st.session_state:
+    st.session_state.dark_theme = True
 
-THEMES = {
-    'dark': {
-        'bg': '#0f111a', 'text': '#f0f2f6', 'card': 'rgba(30, 35, 45, 0.6)',
-        'border': 'rgba(255,255,255,0.08)', 'sub': '#94a3b8', 'primary': '#00d4ff',
-        'hover': '#00b0d4', 'btn_text': '#0f111a', 'shadow': '0 8px 32px rgba(0,0,0,0.5)'
-    },
-    'light': {
-        'bg': '#f5f7fa', 'text': '#1e293b', 'card': 'rgba(255, 255, 255, 0.75)',
-        'border': '#e2e8f0', 'sub': '#64748b', 'primary': '#1a73e8',
-        'hover': '#1557b0', 'btn_text': '#ffffff', 'shadow': '0 4px 12px rgba(0,0,0,0.05)'
-    }
-}
-c = THEMES[st.session_state.theme]
+def toggle_theme():
+    st.session_state.dark_theme = not st.session_state.dark_theme
 
-# ---------- DYNAMIC CSS (Monarch/CRED Glassmorphism) ----------
-css = f"""
+# ---------- CSS (Neumorphic + Theme Support) FIXED ----------
+theme_css = """
 <style>
     .stApp {{
-        background-color: {c['bg']};
-        color: {c['text']};
+        background-color: {bg_color};
+        color: {text_color};
     }}
     .sheet-card {{
-        background: {c['card']};
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-radius: 20px;
-        padding: 16px 20px;
-        margin-bottom: 16px;
-        border: 1px solid {c['border']};
-        box-shadow: {c['shadow']};
+        background: {card_bg};
+        border-radius: 16px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        box-shadow: {card_shadow};
+        border: 1px solid {card_border};
         text-align: center;
         transition: all 0.3s ease;
     }}
     .sheet-card:hover {{
-        transform: translateY(-4px);
-        box-shadow: 0 12px 40px rgba(0,0,0,{0.7 if st.session_state.theme=='dark' else 0.1});
+        transform: translateY(-2px);
+        box-shadow: {card_shadow_hover};
     }}
     .sheet-card-header {{
-        color: {c['sub']};
+        color: {sub_text};
         font-size: 0.7rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }}
     .sheet-card-value {{
-        font-size: 1.6rem;
+        font-size: 1.4rem;
         font-weight: 700;
-        color: {c['primary']};
+        color: {primary_color};
     }}
     .sheet-card-sub {{
         font-size: 0.55rem;
-        color: {c['sub']};
+        color: {sub_text};
         margin-top: 4px;
     }}
     .stButton button {{
@@ -75,22 +61,22 @@ css = f"""
         border-radius: 12px;
         font-weight: 600;
         border: none;
-        background: {c['primary']};
-        color: {c['btn_text']};
-        padding: 12px 0;
+        background: {primary_color};
+        color: white;
+        padding: 10px 0;
         transition: 0.3s;
     }}
     .stButton button:hover {{
-        background: {c['hover']};
+        background: {primary_hover};
         transform: scale(1.02);
     }}
     .stDataFrame {{ font-size: 0.8rem; }}
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
-    
+    /* Mobile optimizations */
     @media (max-width: 768px) {{
-        .sheet-card {{ padding: 10px 12px; min-width: 60px; }}
-        .sheet-card-value {{ font-size: 1.2rem; }}
+        .sheet-card {{ padding: 8px 10px; min-width: 60px; }}
+        .sheet-card-value {{ font-size: 1rem; }}
         .stColumns {{ flex-wrap: wrap !important; }}
         .stColumn {{ flex: 1 1 45% !important; min-width: 60px; }}
     }}
@@ -99,6 +85,30 @@ css = f"""
     }}
 </style>
 """
+if st.session_state.dark_theme:
+    css = theme_css.format(
+        bg_color="#0e1117",
+        text_color="#f0f2f6",
+        card_bg="#1e2630",
+        card_shadow="0 6px 12px rgba(0,0,0,0.4)",
+        card_shadow_hover="0 10px 20px rgba(0,0,0,0.6)",
+        card_border="#2c3e50",
+        sub_text="#94a3b8",
+        primary_color="#00d4ff",
+        primary_hover="#00b0d4"
+    )
+else:
+    css = theme_css.format(
+        bg_color="#f1f3f6",
+        text_color="#1e293b",
+        card_bg="#ffffff",
+        card_shadow="0 4px 12px rgba(0,0,0,0.05)",
+        card_shadow_hover="0 8px 24px rgba(0,0,0,0.08)",
+        card_border="#e2e8f0",
+        sub_text="#64748b",
+        primary_color="#2563eb",
+        primary_hover="#1d4ed8"
+    )
 st.markdown(css, unsafe_allow_html=True)
 
 # ---------- GOOGLE SHEET CONNECTION ----------
@@ -119,7 +129,7 @@ def get_gsheet_client():
         st.error(f"❌ Connection Error: {e}")
         return None
 
-# ---------- CACHED DATA LOAD ----------
+# ---------- CACHED DATA LOAD (60 SECONDS TTL) ----------
 @st.cache_data(ttl=60)
 def load_all_sheets():
     gc = get_gsheet_client()
@@ -128,7 +138,7 @@ def load_all_sheets():
     
     data = {}
     worksheet_names = ['Transactions', 'Budget', 'Accounts', 'Investments', 'EmiManager', 
-                       'Goals', 'FuelTracker', 'Settings']
+                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories', 'CustomNatures', 'Recurring']
     
     try:
         sh = gc.open(SHEET_NAME)
@@ -204,142 +214,73 @@ def update_settings(key, value):
     except Exception as e:
         st.warning(f"Could not update settings: {e}")
 
-# ---------- AI SUBSCRIPTION DETECTIVE ----------
-def detect_subscription_anomalies():
-    df = st.session_state.transactions
-    if df.empty:
-        return []
-    df['Date'] = pd.to_datetime(df['Date'])
-    df = df[df['Type'] == 'Expense']
-    if df.empty:
-        return []
-    desc_counts = df['Description'].value_counts()
-    recurring_desc = desc_counts[desc_counts >= 2].index.tolist()
-    alerts = []
-    telecom_keywords = ['jio', 'airtel', 'vi', 'vodafone', 'recharge']
-    for desc in recurring_desc:
-        sub_df = df[df['Description'] == desc].sort_values('Date')
-        if len(sub_df) >= 2:
-            prices = sub_df['Amount'].values
-            if len(prices) >= 2 and prices[-1] != prices[0]:
-                is_telecom = any(kw in desc.lower() for kw in telecom_keywords)
-                if is_telecom:
-                    alerts.append(f"⚠️ AI Detective: Your {desc} recharge price increased from ₹{prices[0]:.0f} to ₹{prices[-1]:.0f}!")
-                else:
-                    alerts.append(f"⚠️ AI Detective: {desc} charges changed from ₹{prices[0]:.0f} to ₹{prices[-1]:.0f}.")
-    return alerts
-
-# ---------- DAILY AUTO ENTRIES (Gold + SIP Axis) ----------
-def add_daily_auto_entries():
-    today = datetime.now().strftime('%Y-%m-%d')
-    df = st.session_state.transactions
-    if df.empty:
-        rows = [
-            [today, "Daily Gold Saving", "Gold", 20, "Investment", "Cash", '✅'],
-            [today, "Axis Gold Fund (SIP)", "SIP", 10, "Investment", "Cash", '✅']
-        ]
-        for row in rows:
-            append_to_worksheet('Transactions', row)
-        new_df = pd.DataFrame([{
-            'Date': today, 'Description': "Daily Gold Saving", 'Category': "Gold",
-            'Amount': 20, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-        }, {
-            'Date': today, 'Description': "Axis Gold Fund (SIP)", 'Category': "SIP",
-            'Amount': 10, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-        }])
-        st.session_state.transactions = pd.concat([df, new_df], ignore_index=True)
+# ---------- RECURRING TRANSACTIONS PROCESSING ----------
+def process_recurring():
+    """Check if any recurring transaction is due today and add it."""
+    recurring_df = st.session_state.get('recurring', pd.DataFrame())
+    if recurring_df.empty:
         return
-    today_df = df[df['Date'] == today]
-    if today_df.empty:
-        rows = [
-            [today, "Daily Gold Saving", "Gold", 20, "Investment", "Cash", '✅'],
-            [today, "Axis Gold Fund (SIP)", "SIP", 10, "Investment", "Cash", '✅']
-        ]
-        for row in rows:
-            append_to_worksheet('Transactions', row)
-        new_df = pd.DataFrame([{
-            'Date': today, 'Description': "Daily Gold Saving", 'Category': "Gold",
-            'Amount': 20, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-        }, {
-            'Date': today, 'Description': "Axis Gold Fund (SIP)", 'Category': "SIP",
-            'Amount': 10, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-        }])
-        st.session_state.transactions = pd.concat([df, new_df], ignore_index=True)
-    else:
-        if not any(today_df['Description'] == "Daily Gold Saving"):
-            row = [today, "Daily Gold Saving", "Gold", 20, "Investment", "Cash", '✅']
-            append_to_worksheet('Transactions', row)
-            new_row = pd.DataFrame([{
-                'Date': today, 'Description': "Daily Gold Saving", 'Category': "Gold",
-                'Amount': 20, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-            }])
-            st.session_state.transactions = pd.concat([df, new_row], ignore_index=True)
-        if not any(today_df['Description'] == "Axis Gold Fund (SIP)"):
-            row = [today, "Axis Gold Fund (SIP)", "SIP", 10, "Investment", "Cash", '✅']
-            append_to_worksheet('Transactions', row)
-            new_row = pd.DataFrame([{
-                'Date': today, 'Description': "Axis Gold Fund (SIP)", 'Category': "SIP",
-                'Amount': 10, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-            }])
-            st.session_state.transactions = pd.concat([df, new_row], ignore_index=True)
+    today = datetime.now().date()
+    for idx, row in recurring_df.iterrows():
+        next_date = pd.to_datetime(row['NextDate']).date()
+        if next_date <= today:
+            # Add transaction
+            new_row = [today.strftime('%Y-%m-%d'), row['Description'], row['Category'], 
+                       row['Amount'], row['Type'], row['Payment Mode'], '✅']
+            st.session_state.transactions = pd.concat([st.session_state.transactions, 
+                pd.DataFrame([{
+                    'Date': today.strftime('%Y-%m-%d'),
+                    'Description': row['Description'],
+                    'Category': row['Category'],
+                    'Amount': row['Amount'],
+                    'Type': row['Type'],
+                    'Payment Mode': row['Payment Mode'],
+                    'Status': '✅'
+                }])], ignore_index=True)
+            append_to_worksheet('Transactions', new_row)
+            # Update next date based on frequency
+            freq = row['Frequency']
+            if freq == 'Daily':
+                next_date = today + timedelta(days=1)
+            elif freq == 'Weekly':
+                next_date = today + timedelta(days=7)
+            elif freq == 'Monthly':
+                next_date = today + timedelta(days=30)
+            elif freq == 'Yearly':
+                next_date = today + timedelta(days=365)
+            else:
+                next_date = today + timedelta(days=30)  # default
+            # Update recurring sheet
+            recurring_df.at[idx, 'NextDate'] = next_date.strftime('%Y-%m-%d')
+    update_worksheet('Recurring', recurring_df)
+    st.session_state.recurring = recurring_df
 
-# ---------- AI CATEGORIZATION ----------
+# ---------- AI CATEGORIZATION (Simple Keyword Mapping) ----------
+AI_CATEGORY_MAP = {
+    'zomato': 'Food',
+    'swiggy': 'Food',
+    'uber': 'Transport',
+    'ola': 'Transport',
+    'amazon': 'Shopping',
+    'flipkart': 'Shopping',
+    'netflix': 'Entertainment',
+    'spotify': 'Entertainment',
+    'rent': 'Rent',
+    'salary': 'Salary',
+    'emi': 'EMI',
+    'fuel': 'Fuel',
+    'groceries': 'Groceries',
+    'vegetables': 'Vegetables',
+    'mobile': 'Mobile Recharge',
+    'electricity': 'Utilities',
+    'water': 'Utilities',
+}
 def ai_categorize(desc):
     desc_lower = desc.lower()
-    keywords = {
-        'zomato': 'Food', 'swiggy': 'Food', 'uber': 'Transport', 'ola': 'Transport',
-        'amazon': 'Shopping', 'flipkart': 'Shopping', 'netflix': 'Entertainment',
-        'spotify': 'Entertainment', 'rent': 'Rent', 'salary': 'Salary', 'emi': 'EMI',
-        'fuel': 'Fuel', 'groceries': 'Groceries', 'vegetables': 'Vegetables',
-        'mobile': 'Mobile Recharge', 'electricity': 'Utilities', 'water': 'Utilities'
-    }
-    for keyword, category in keywords.items():
+    for keyword, category in AI_CATEGORY_MAP.items():
         if keyword in desc_lower:
             return category
     return 'Others'
-
-# ---------- AI ASSISTANT (Rule-based Chatbot) ----------
-def ai_assistant_response(query):
-    df = st.session_state.transactions
-    if df.empty:
-        return "No transaction data available yet. Please add some transactions first."
-    current_month = datetime.now().strftime('%B')
-    df['Date'] = pd.to_datetime(df['Date'])
-    df_month = df[df['Date'].dt.month_name() == current_month]
-    
-    query = query.lower()
-    if "spend" in query and "groceries" in query:
-        amt = df_month[df_month['Category'] == 'Groceries']['Amount'].sum()
-        return f"💰 You've spent ₹{amt:.0f} on groceries this month."
-    elif "salary" in query:
-        amt = df_month[df_month['Category'] == 'Salary']['Amount'].sum()
-        return f"📈 Your total salary this month: ₹{amt:.0f}"
-    elif "total expense" in query or "expense" in query:
-        amt = df_month[df_month['Type'] == 'Expense']['Amount'].sum()
-        return f"📉 Your total expenses this month: ₹{amt:.0f}"
-    elif "total income" in query or "income" in query:
-        amt = df_month[df_month['Type'] == 'Income']['Amount'].sum()
-        return f"📈 Your total income this month: ₹{amt:.0f}"
-    elif "savings" in query:
-        inc = df_month[df_month['Type'] == 'Income']['Amount'].sum()
-        exp = df_month[df_month['Type'] == 'Expense']['Amount'].sum()
-        savings = inc - exp
-        return f"💎 Your savings this month: ₹{savings:.0f}"
-    elif "emi" in query:
-        emi_df = st.session_state.emi
-        if emi_df.empty:
-            return "No EMI loans found."
-        total_emi = emi_df['EMI Amount'].sum()
-        return f"🏦 Your total monthly EMI: ₹{total_emi:.0f}"
-    elif "investment" in query or "invest" in query:
-        inv_df = st.session_state.investments
-        if inv_df.empty:
-            return "No investments found."
-        total_inv = inv_df['Total Invested'].sum()
-        curr_val = inv_df['Current Value'].sum()
-        return f"📈 Total invested: ₹{total_inv:.0f}, Current value: ₹{curr_val:.0f}"
-    else:
-        return "I can help with: spending, income, savings, EMI, investments, or categories like groceries, salary, etc. Try asking me something specific!"
 
 # ---------- SESSION STATE ----------
 def init_session_state():
@@ -424,6 +365,37 @@ def init_session_state():
         else:
             st.session_state.last_sync_time = "Never"
 
+    # 9. Custom Types
+    loaded = all_data.get('CustomTypes', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['TypeName','Nature']):
+        st.session_state.custom_types = pd.DataFrame(columns=['TypeName','Nature'])
+    else:
+        st.session_state.custom_types = loaded
+
+    # 10. Custom Categories
+    loaded = all_data.get('CustomCategories', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Category']):
+        st.session_state.custom_categories = pd.DataFrame(columns=['Category'])
+    else:
+        st.session_state.custom_categories = loaded
+
+    # 11. Custom Natures
+    loaded = all_data.get('CustomNatures', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Nature']):
+        st.session_state.custom_natures = pd.DataFrame({'Nature': ['Income', 'Expense']})
+    else:
+        st.session_state.custom_natures = loaded
+
+    # 12. Recurring
+    loaded = all_data.get('Recurring', pd.DataFrame())
+    if loaded.empty:
+        st.session_state.recurring = pd.DataFrame(columns=['Description','Category','Amount','Type','Payment Mode','Frequency','NextDate'])
+    else:
+        st.session_state.recurring = loaded
+
+    # Process recurring transactions
+    process_recurring()
+
 if 'initialized' not in st.session_state:
     init_session_state()
     st.session_state.initialized = True
@@ -459,6 +431,10 @@ def force_sync():
         update_worksheet('EmiManager', st.session_state.emi)
         update_worksheet('Goals', st.session_state.goals)
         update_worksheet('FuelTracker', st.session_state.fuel)
+        update_worksheet('CustomTypes', st.session_state.custom_types)
+        update_worksheet('CustomCategories', st.session_state.custom_categories)
+        update_worksheet('CustomNatures', st.session_state.custom_natures)
+        update_worksheet('Recurring', st.session_state.recurring)
         
         sync_time = datetime.now().strftime("%d %b %Y, %H:%M:%S")
         update_settings('last_sync_time', sync_time)
@@ -469,34 +445,40 @@ def force_sync():
     except Exception as e:
         return False, f"❌ Sync failed: {e}"
 
-# ---------- APP UI ----------
-# Header with Theme Toggle
-col_h1, col_h2 = st.columns([0.85, 0.15])
-with col_h1:
-    st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
-with col_h2:
-    if st.button("🌓 Toggle Theme", key="theme_toggle"):
-        st.session_state.theme = 'light' if st.session_state.theme == 'dark' else 'dark'
-        st.rerun()
+# ---------- EXPORT CSV ----------
+def export_transactions_csv():
+    df = st.session_state.transactions
+    if df.empty:
+        return None
+    csv = df.to_csv(index=False).encode('utf-8')
+    return csv
 
+# ---------- APP UI ----------
+st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
 
-# Run daily auto entries on each load
-add_daily_auto_entries()
+# Theme Toggle
+col_toggle, _ = st.columns([1, 4])
+with col_toggle:
+    if st.button("🌓 Toggle Theme", key="theme_toggle"):
+        toggle_theme()
+        st.rerun()
 
-# Navigation
-nav = st.radio("Menu", ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"], index=0, horizontal=True, key='nav_radio')
-st.session_state.page = nav
+# Radio Navigation with proper state management
+nav = st.radio(
+    "Menu",
+    ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"],
+    index=["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"].index(st.session_state.page),
+    horizontal=True,
+    key='nav_radio'
+)
+if nav != st.session_state.page:
+    st.session_state.page = nav
 
 # ===================== HOME =====================
 if st.session_state.page == "🏠 Home":
     st.markdown("## 📊 Dashboard")
     
-    # Show AI Alerts
-    alerts = detect_subscription_anomalies()
-    for alert in alerts:
-        st.warning(alert)
-
     current_month = datetime.now().strftime('%B')
     df_tx = st.session_state.transactions
     
@@ -539,7 +521,7 @@ if st.session_state.page == "🏠 Home":
     # BC stats
     bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
 
-    # Hand Loan stats
+    # Hand Loan stats (using custom type: we will treat any transaction with Type "Hand Loan" as outstanding)
     if not df_tx.empty:
         handloan_income = df_tx[(df_tx['Type'] == 'Hand Loan') & (df_tx['Type'] == 'Income')]['Amount'].sum()
         handloan_expense = df_tx[(df_tx['Type'] == 'Hand Loan') & (df_tx['Type'] == 'Expense')]['Amount'].sum()
@@ -585,50 +567,7 @@ if st.session_state.page == "🏠 Home":
     with col11:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_total)}</div><div class='sheet-card-sub'>All time</div></div>", unsafe_allow_html=True)
 
-    # Row 4: Net Worth History (6 months trend) - FIXED
-    st.markdown("### 📈 Net Worth Trend")
-    if not df_tx.empty:
-        df_tx['Date'] = pd.to_datetime(df_tx['Date'])
-        df_tx['Month'] = df_tx['Date'].dt.to_period('M')
-        monthly_net = df_tx.groupby('Month').apply(lambda x: x[x['Type']=='Income']['Amount'].sum() - x[x['Type']=='Expense']['Amount'].sum()).reset_index()
-        monthly_net.columns = ['Month', 'Net Worth']
-        # 🛡️ FIX: Convert Period to string for Plotly JSON serialization
-        monthly_net['Month'] = monthly_net['Month'].astype(str)
-        # Add Investments and subtract EMI
-        if not st.session_state.investments.empty:
-            monthly_net['Net Worth'] += st.session_state.investments['Current Value'].sum()
-        if not st.session_state.emi.empty:
-            monthly_net['Net Worth'] -= st.session_state.emi['Remaining'].sum()
-        fig = px.line(monthly_net.tail(6), x='Month', y='Net Worth', title='Last 6 Months Net Worth')
-        fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#f0f2f6')
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Add transactions to see Net Worth trend.")
-
-    # Row 5: AI Insights Card
-    st.markdown("### 🤖 AI Insights")
-    col_ai1, col_ai2 = st.columns(2)
-    with col_ai1:
-        # Top spending category
-        if not df_tx.empty:
-            top_exp = df_month[df_month['Type']=='Expense'].groupby('Category')['Amount'].sum().sort_values(ascending=False).head(1)
-            if not top_exp.empty:
-                top_cat = top_exp.index[0]
-                top_amt = top_exp.values[0]
-                st.info(f"📊 Your top spending category this month is **{top_cat}** (₹{top_amt:.0f}).")
-            else:
-                st.info("No expenses yet.")
-        else:
-            st.info("Add transactions to see insights.")
-    with col_ai2:
-        # Savings rate
-        if monthly_inc > 0:
-            rate = (savings / monthly_inc) * 100
-            st.info(f"💎 Your savings rate this month is **{rate:.1f}%**.")
-        else:
-            st.info("No income recorded yet.")
-
-    # Row 6: Recent Transactions
+    # Row 4: Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
     if not recent.empty:
@@ -636,7 +575,7 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No transactions yet.")
 
-    # Row 7: MANUAL SYNC BUTTON
+    # Row 5: MANUAL SYNC BUTTON
     st.markdown("---")
     col_sync1, col_sync2 = st.columns([3, 1])
     with col_sync1:
@@ -758,6 +697,13 @@ elif st.session_state.page == "➕ Add":
             else:
                 desc = f"Fuel - {f_litres:.1f} L"
     
+    # AI Categorization: if description is entered and category is empty, suggest
+    if desc and not category:
+        suggested = ai_categorize(desc)
+        if suggested != 'Others':
+            st.info(f"🤖 Suggested category: {suggested}")
+            # We can auto-select but we leave user to choose.
+    
     if st.button("✅ Add Transaction", key="submit_btn"):
         success_msg = None
         error_msg = None
@@ -854,6 +800,7 @@ elif st.session_state.page == "➕ Add":
         if error_msg:
             st.error(error_msg)
         
+        # 🛠️ FIX: Safely switch to Home and refresh without touching radio key
         st.session_state.page = "🏠 Home"
         st.cache_data.clear()
         st.rerun()
@@ -947,6 +894,7 @@ elif st.session_state.page == "➕ Add":
             if error_msg:
                 st.error(error_msg)
             
+            # 🛠️ FIX: Safely switch to Home and refresh
             st.session_state.page = "🏠 Home"
             st.cache_data.clear()
             st.rerun()
@@ -1027,7 +975,7 @@ elif st.session_state.page == "🎯 Budget":
             st.info("No categories to delete.")
 
         st.markdown("---")
-        st.markdown("### ✏️ Edit Category (Actual This Month auto-updates)")
+        st.markdown("### ✏️ Edit Category (Actual This Month auto-updates from Transactions)")
         new_cat = st.text_input("New Category Name (Leave blank to edit existing)")
         sel_cat = st.selectbox("Or select existing to edit", df['Category'].tolist() + ["New"])
         
@@ -1070,6 +1018,7 @@ elif st.session_state.page == "🏦 Bank":
             if amt_add > 0:
                 idx = st.session_state.accounts[st.session_state.accounts['Account'] == acc_add].index[0]
                 st.session_state.accounts.loc[idx, 'Balance'] += amt_add
+                # Create transaction
                 new_row = [datetime.now().strftime('%Y-%m-%d'), desc_add, "Deposit", amt_add, "Income", acc_add, '✅']
                 new_df = pd.DataFrame([{
                     'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_add, 'Category': "Deposit",
@@ -1079,6 +1028,7 @@ elif st.session_state.page == "🏦 Bank":
                 append_to_worksheet('Transactions', new_row)
                 update_worksheet('Accounts', st.session_state.accounts)
                 st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
+                
                 st.session_state.page = "🏠 Home"
                 st.cache_data.clear()
                 st.rerun()
@@ -1096,6 +1046,7 @@ elif st.session_state.page == "🏦 Bank":
                 current_bal = st.session_state.accounts.loc[idx, 'Balance']
                 if current_bal >= amt_with:
                     st.session_state.accounts.loc[idx, 'Balance'] -= amt_with
+                    # Create transaction
                     new_row = [datetime.now().strftime('%Y-%m-%d'), desc_with, "Withdrawal", amt_with, "Expense", acc_with, '✅']
                     new_df = pd.DataFrame([{
                         'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_with, 'Category': "Withdrawal",
@@ -1105,6 +1056,7 @@ elif st.session_state.page == "🏦 Bank":
                     append_to_worksheet('Transactions', new_row)
                     update_worksheet('Accounts', st.session_state.accounts)
                     st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
+                    
                     st.session_state.page = "🏠 Home"
                     st.cache_data.clear()
                     st.rerun()
@@ -1130,6 +1082,7 @@ elif st.session_state.page == "🏦 Bank":
                         to_idx = st.session_state.accounts[st.session_state.accounts['Account'] == to_acc].index[0]
                         st.session_state.accounts.loc[from_idx, 'Balance'] -= amt_trans
                         st.session_state.accounts.loc[to_idx, 'Balance'] += amt_trans
+                        # Create transaction
                         new_row = [datetime.now().strftime('%Y-%m-%d'), f"{desc_trans} (From {from_acc} to {to_acc})", "Transfer", amt_trans, "Transfer", f"{from_acc} -> {to_acc}", '✅']
                         new_df = pd.DataFrame([{
                             'Date': datetime.now().strftime('%Y-%m-%d'), 
@@ -1144,6 +1097,7 @@ elif st.session_state.page == "🏦 Bank":
                         append_to_worksheet('Transactions', new_row)
                         update_worksheet('Accounts', st.session_state.accounts)
                         st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
+                        
                         st.session_state.page = "🏠 Home"
                         st.cache_data.clear()
                         st.rerun()
@@ -1161,13 +1115,14 @@ elif st.session_state.page == "🏦 Bank":
             update_worksheet('Accounts', st.session_state.accounts)
             st.cache_data.clear()
             st.success("✅ All account balances reset to ₹0!")
+            
             st.session_state.page = "🏠 Home"
             st.rerun()
 
-# ===================== MORE (Premium Modules + AI Assistant) =====================
+# ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "🤖 AI Assistant"])
+    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "⚙️ Customization", "📋 All Transactions", "🔄 Recurring"])
     
     # ---------- Investments ----------
     with tabs[0]:
@@ -1247,7 +1202,7 @@ elif st.session_state.page == "⚡ More":
                 st.success("Goal Deleted!")
                 st.rerun()
     
-    # ---------- Reports ----------
+    # ---------- Reports (with Export CSV) ----------
     with tabs[3]:
         st.markdown("### 📊 Monthly Analysis")
         df = st.session_state.transactions
@@ -1262,14 +1217,14 @@ elif st.session_state.page == "⚡ More":
             merged = pd.merge(inc, exp, on='Month', how='outer').fillna(0)
             merged.columns = ['Month','Income','Expense']
             fig1 = px.bar(merged, x='Month', y=['Income','Expense'], barmode='group', color_discrete_map={'Income':'#10b981', 'Expense':'#ef4444'})
-            fig1.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
+            fig1.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
             st.plotly_chart(fig1, use_container_width=True)
             
             # 2. Expense Breakdown
             df_exp = df[df['Type']=='Expense'].groupby('Category')['Amount'].sum().reset_index()
             if not df_exp.empty:
                 fig2 = px.pie(df_exp, names='Category', values='Amount', title="🧾 Expense Breakdown", hole=0.3)
-                fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=30,b=0))
+                fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig2, use_container_width=True)
             
             # 3. Fuel
@@ -1279,7 +1234,7 @@ elif st.session_state.page == "⚡ More":
                 fuel_df['Month'] = fuel_df['Date'].dt.month_name()
                 fuel_monthly = fuel_df.groupby('Month')['Cost (₹)'].sum().reset_index()
                 fig3 = px.bar(fuel_monthly, x='Month', y='Cost (₹)', title="⛽ Fuel Cost Per Month", color_discrete_sequence=['#f59e0b'])
-                fig3.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
+                fig3.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig3, use_container_width=True)
             
             # 4. EMI
@@ -1287,10 +1242,10 @@ elif st.session_state.page == "⚡ More":
             if not emi_tx.empty:
                 emi_monthly = emi_tx.groupby('Month')['Amount'].sum().reset_index()
                 fig4 = px.bar(emi_monthly, x='Month', y='Amount', title="🏦 EMI Payments Per Month", color_discrete_sequence=['#ef4444'])
-                fig4.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
+                fig4.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig4, use_container_width=True)
             
-            # 5. Investment
+            # 5. Investment (SIP+Gold)
             inv_df = st.session_state.investments
             if not inv_df.empty:
                 total_inv = inv_df[inv_df['Name'].str.upper().isin(['SIP','GOLD'])]['Total Invested'].sum()
@@ -1301,7 +1256,7 @@ elif st.session_state.page == "⚡ More":
                 inv_compare = inv_df[inv_df['Name'].str.upper().isin(['SIP','GOLD'])].copy()
                 if not inv_compare.empty:
                     fig5 = px.bar(inv_compare, x='Name', y=['Total Invested', 'Current Value'], barmode='group', title="📈 SIP & Gold Performance")
-                    fig5.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
+                    fig5.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                     st.plotly_chart(fig5, use_container_width=True)
             
             # 6. BC
@@ -1309,19 +1264,259 @@ elif st.session_state.page == "⚡ More":
             if not bc_tx.empty:
                 bc_monthly = bc_tx.groupby('Month')['Amount'].sum().reset_index()
                 fig6 = px.bar(bc_monthly, x='Month', y='Amount', title="💳 BC (Bachat Gat) Per Month", color_discrete_sequence=['#3b82f6'])
-                fig6.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
+                fig6.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig6, use_container_width=True)
+            
+            # Export CSV Button
+            st.markdown("### 📥 Export Data")
+            csv_data = export_transactions_csv()
+            if csv_data:
+                st.download_button(
+                    label="📥 Download Transactions as CSV",
+                    data=csv_data,
+                    file_name=f"transactions_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("No transactions to export.")
         else:
             st.info("Add some transactions to see detailed reports.")
     
-    # ---------- AI Assistant ----------
+    # ---------- Customization ----------
     with tabs[4]:
-        st.markdown("### 🤖 AI Assistant")
-        st.info("Ask me anything about your finances. I can analyze your spending, suggest budgets, and more.")
+        st.markdown("### ⚙️ Custom Types, Categories & Natures")
+        st.info("Add your own Transaction Types, Categories, and Natures. They will appear in the Add Transaction dropdowns.")
         
-        user_query = st.text_input("Ask a question:", placeholder="E.g., How much did I spend on groceries this month?")
-        if user_query:
-            response = ai_assistant_response(user_query)
-            st.success(f"🤖 {response}")
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            st.markdown("#### 📌 Custom Types")
+            if not st.session_state.custom_types.empty:
+                st.dataframe(st.session_state.custom_types, hide_index=True, use_container_width=True)
+            else:
+                st.info("No custom types added yet.")
+            
+            with st.form("add_custom_type"):
+                type_name = st.text_input("Type Name")
+                type_nature = st.selectbox("Nature", st.session_state.custom_natures['Nature'].tolist())
+                if st.form_submit_button("Add Type"):
+                    if type_name:
+                        new_type = pd.DataFrame({'TypeName':[type_name], 'Nature':[type_nature]})
+                        st.session_state.custom_types = pd.concat([st.session_state.custom_types, new_type], ignore_index=True)
+                        update_worksheet('CustomTypes', st.session_state.custom_types)
+                        st.cache_data.clear()
+                        st.success(f"Type '{type_name}' added!")
+                        st.rerun()
+            
+            if not st.session_state.custom_types.empty:
+                type_to_del = st.selectbox("Delete a Custom Type", st.session_state.custom_types['TypeName'])
+                if st.button("🗑️ Delete Type"):
+                    idx = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == type_to_del].index[0]
+                    st.session_state.custom_types = st.session_state.custom_types.drop(idx).reset_index(drop=True)
+                    update_worksheet('CustomTypes', st.session_state.custom_types)
+                    st.cache_data.clear()
+                    st.success(f"Type '{type_to_del}' deleted!")
+                    st.rerun()
+        
+        with col_t2:
+            st.markdown("#### 🏷️ Custom Categories")
+            if not st.session_state.custom_categories.empty:
+                st.dataframe(st.session_state.custom_categories, hide_index=True, use_container_width=True)
+            else:
+                st.info("No custom categories added yet.")
+            
+            with st.form("add_custom_category"):
+                cat_name = st.text_input("Category Name")
+                if st.form_submit_button("Add Category"):
+                    if cat_name:
+                        new_cat = pd.DataFrame({'Category':[cat_name]})
+                        st.session_state.custom_categories = pd.concat([st.session_state.custom_categories, new_cat], ignore_index=True)
+                        update_worksheet('CustomCategories', st.session_state.custom_categories)
+                        st.cache_data.clear()
+                        st.success(f"Category '{cat_name}' added!")
+                        st.rerun()
+            
+            if not st.session_state.custom_categories.empty:
+                cat_to_del = st.selectbox("Delete a Custom Category", st.session_state.custom_categories['Category'])
+                if st.button("🗑️ Delete Category"):
+                    idx = st.session_state.custom_categories[st.session_state.custom_categories['Category'] == cat_to_del].index[0]
+                    st.session_state.custom_categories = st.session_state.custom_categories.drop(idx).reset_index(drop=True)
+                    update_worksheet('CustomCategories', st.session_state.custom_categories)
+                    st.cache_data.clear()
+                    st.success(f"Category '{cat_to_del}' deleted!")
+                    st.rerun()
+        
+        # Custom Natures
+        st.markdown("#### 🌿 Custom Natures")
+        st.info("Add new natures like 'Neutral', 'Credit', 'Debit'. (Default 'Income' and 'Expense' are protected and cannot be deleted.)")
+        if not st.session_state.custom_natures.empty:
+            st.dataframe(st.session_state.custom_natures, hide_index=True, use_container_width=True)
         else:
-            st.write("💡 Try asking: 'How much did I spend on groceries?', 'What is my total expense?', 'How much savings do I have?' etc.")
+            st.info("No custom natures added yet.")
+        
+        with st.form("add_custom_nature"):
+            nature_name = st.text_input("Nature Name")
+            if st.form_submit_button("Add Nature"):
+                if nature_name:
+                    if nature_name in st.session_state.custom_natures['Nature'].values:
+                        st.warning("Nature already exists.")
+                    else:
+                        new_nature = pd.DataFrame({'Nature':[nature_name]})
+                        st.session_state.custom_natures = pd.concat([st.session_state.custom_natures, new_nature], ignore_index=True)
+                        update_worksheet('CustomNatures', st.session_state.custom_natures)
+                        st.cache_data.clear()
+                        st.success(f"Nature '{nature_name}' added!")
+                        st.rerun()
+        
+        if not st.session_state.custom_natures.empty:
+            deletable_natures = st.session_state.custom_natures[~st.session_state.custom_natures['Nature'].isin(['Income', 'Expense'])]
+            if not deletable_natures.empty:
+                nature_to_del = st.selectbox("Delete a Custom Nature", deletable_natures['Nature'])
+                if st.button("🗑️ Delete Nature"):
+                    idx = st.session_state.custom_natures[st.session_state.custom_natures['Nature'] == nature_to_del].index[0]
+                    st.session_state.custom_natures = st.session_state.custom_natures.drop(idx).reset_index(drop=True)
+                    update_worksheet('CustomNatures', st.session_state.custom_natures)
+                    st.cache_data.clear()
+                    st.success(f"Nature '{nature_to_del}' deleted!")
+                    st.rerun()
+            else:
+                st.info("Only custom natures can be deleted. 'Income' and 'Expense' are default.")
+    
+    # ---------- All Transactions ----------
+    with tabs[5]:
+        st.markdown("### 📋 All Transactions")
+        df = st.session_state.transactions
+        if not df.empty:
+            st.dataframe(df.sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
+            st.markdown("#### 🗑️ Delete a Transaction")
+            if not df.empty:
+                df_del = df.copy()
+                df_del['Display'] = df_del['Date'].astype(str) + " | " + df_del['Description'].astype(str) + " | ₹" + df_del['Amount'].astype(str)
+                to_delete = st.selectbox("Select transaction to delete", df_del['Display'])
+                if st.button("🗑️ Delete Selected Transaction"):
+                    success_msg = None
+                    error_msg = None
+                    try:
+                        idx = df_del[df_del['Display'] == to_delete].index[0]
+                        tx = st.session_state.transactions.iloc[idx]
+                        ttype = tx['Type']
+                        category = tx['Category']
+                        amount = tx['Amount']
+                        payment_mode = tx['Payment Mode']
+                        
+                        # Reverse budget, EMI, Investment, Fuel, Account Balance (same logic)
+                        if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
+                            cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
+                            st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
+                            update_worksheet('Budget', st.session_state.budget)
+                        
+                        if ttype == 'Expense' and 'EMI' in category and not st.session_state.emi.empty:
+                            for loan in st.session_state.emi['Loan Name']:
+                                if loan in tx['Description'] or loan in category:
+                                    emi_idx = st.session_state.emi[st.session_state.emi['Loan Name'] == loan].index[0]
+                                    st.session_state.emi.loc[emi_idx, 'Remaining'] += amount
+                                    update_worksheet('EmiManager', st.session_state.emi)
+                                    break
+                        
+                        if ttype == 'Investment':
+                            inv_name = None
+                            for inv in st.session_state.investments['Name']:
+                                if inv in tx['Description'] or inv in category:
+                                    inv_name = inv
+                                    break
+                            if inv_name and inv_name in st.session_state.investments['Name'].values:
+                                idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
+                                st.session_state.investments.loc[idx_inv, 'Total Invested'] -= amount
+                                if 'Current Value' in st.session_state.investments.columns:
+                                    st.session_state.investments.loc[idx_inv, 'Current Value'] -= amount
+                                update_worksheet('Investments', st.session_state.investments)
+                        
+                        if ttype == 'Expense' and 'Fuel' in category:
+                            fuel_idx = st.session_state.fuel[
+                                (st.session_state.fuel['Date'] == tx['Date']) & 
+                                (st.session_state.fuel['Cost (₹)'] == amount)
+                            ].index
+                            if not fuel_idx.empty:
+                                st.session_state.fuel = st.session_state.fuel.drop(fuel_idx[0]).reset_index(drop=True)
+                                update_worksheet('FuelTracker', st.session_state.fuel)
+                        
+                        if ttype != "Transfer":
+                            acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
+                            if not acc_idx.empty:
+                                idx = acc_idx[0]
+                                default_nature_map = {
+                                    "Income": "Income",
+                                    "Expense": "Expense",
+                                    "Investment": "Expense",
+                                    "Transfer": "Neutral",
+                                    "BC": "Expense"
+                                }
+                                custom_nature = None
+                                if ttype in st.session_state.custom_types['TypeName'].values:
+                                    custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+                                nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                                if nature == "Income":
+                                    st.session_state.accounts.loc[idx, 'Balance'] -= amount
+                                elif nature in ["Expense", "BC"]:
+                                    st.session_state.accounts.loc[idx, 'Balance'] += amount
+                                update_worksheet('Accounts', st.session_state.accounts)
+                        
+                        st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
+                        update_worksheet('Transactions', st.session_state.transactions)
+                        success_msg = "✅ Transaction Deleted successfully!"
+                    except Exception as e:
+                        error_msg = f"❌ Error: {e}"
+                    
+                    if success_msg:
+                        st.success(success_msg)
+                    if error_msg:
+                        st.error(error_msg)
+                    
+                    st.session_state.page = "🏠 Home"
+                    st.cache_data.clear()
+                    st.rerun()
+        else:
+            st.info("No transactions yet.")
+    
+    # ---------- Recurring Transactions ----------
+    with tabs[6]:
+        st.markdown("### 🔄 Recurring Transactions")
+        st.info("Add transactions that repeat daily, weekly, or monthly. They will be auto-added on their due date.")
+        
+        recurring_df = st.session_state.recurring
+        st.dataframe(recurring_df, hide_index=True, use_container_width=True)
+        
+        with st.form("add_recurring"):
+            col1, col2 = st.columns(2)
+            with col1:
+                desc = st.text_input("Description")
+                amount = st.number_input("Amount ₹", min_value=0.0)
+                next_date = st.date_input("Next Due Date", datetime.now())
+            with col2:
+                freq = st.selectbox("Frequency", ["Daily", "Weekly", "Monthly", "Yearly"])
+                cat = st.selectbox("Category", all_cats)
+                ttype = st.selectbox("Type", all_types)
+                payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+            if st.form_submit_button("Add Recurring"):
+                new_row = pd.DataFrame([{
+                    'Description': desc,
+                    'Category': cat,
+                    'Amount': amount,
+                    'Type': ttype,
+                    'Payment Mode': payment_mode,
+                    'Frequency': freq,
+                    'NextDate': next_date.strftime('%Y-%m-%d')
+                }])
+                st.session_state.recurring = pd.concat([st.session_state.recurring, new_row], ignore_index=True)
+                update_worksheet('Recurring', st.session_state.recurring)
+                st.cache_data.clear()
+                st.success("Recurring transaction added!")
+                st.rerun()
+        
+        if not recurring_df.empty:
+            if st.button("🗑️ Delete Selected Recurring"):
+                idx = st.selectbox("Select recurring to delete", range(len(recurring_df)), format_func=lambda i: recurring_df.iloc[i]['Description'] + " - " + recurring_df.iloc[i]['NextDate'])
+                st.session_state.recurring = recurring_df.drop(idx).reset_index(drop=True)
+                update_worksheet('Recurring', st.session_state.recurring)
+                st.cache_data.clear()
+                st.success("Recurring deleted!")
+                st.rerun()
