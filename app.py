@@ -325,9 +325,17 @@ def force_sync():
 st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
 
-# Radio Navigation
-nav = st.radio("Menu", ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"], index=0, horizontal=True, key='nav_radio')
-st.session_state.page = nav
+# 🛠️ FIX: Radio button safely reads from st.session_state.page
+nav = st.radio(
+    "Menu",
+    ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"],
+    index=["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"].index(st.session_state.page),
+    horizontal=True,
+    key='nav_radio'
+)
+# Only update page if navigation changed
+if nav != st.session_state.page:
+    st.session_state.page = nav
 
 # ===================== HOME =====================
 if st.session_state.page == "🏠 Home":
@@ -647,11 +655,7 @@ elif st.session_state.page == "➕ Add":
         if error_msg:
             st.error(error_msg)
         
-        # 🔥 FIX: Safe Radio Navigation + Cache Clear
-        try:
-            st.session_state['nav_radio'] = "🏠 Home"
-        except:
-            pass
+        # 🛠️ FIX: Safely switch to Home and refresh without touching radio key
         st.session_state.page = "🏠 Home"
         st.cache_data.clear()
         st.rerun()
@@ -745,11 +749,7 @@ elif st.session_state.page == "➕ Add":
             if error_msg:
                 st.error(error_msg)
             
-            # 🔥 FIX: Safe Radio Navigation + Cache Clear
-            try:
-                st.session_state['nav_radio'] = "🏠 Home"
-            except:
-                pass
+            # 🛠️ FIX: Safely switch to Home and refresh
             st.session_state.page = "🏠 Home"
             st.cache_data.clear()
             st.rerun()
@@ -884,10 +884,6 @@ elif st.session_state.page == "🏦 Bank":
                 update_worksheet('Accounts', st.session_state.accounts)
                 st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
                 
-                try:
-                    st.session_state['nav_radio'] = "🏠 Home"
-                except:
-                    pass
                 st.session_state.page = "🏠 Home"
                 st.cache_data.clear()
                 st.rerun()
@@ -916,10 +912,6 @@ elif st.session_state.page == "🏦 Bank":
                     update_worksheet('Accounts', st.session_state.accounts)
                     st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
                     
-                    try:
-                        st.session_state['nav_radio'] = "🏠 Home"
-                    except:
-                        pass
                     st.session_state.page = "🏠 Home"
                     st.cache_data.clear()
                     st.rerun()
@@ -961,10 +953,6 @@ elif st.session_state.page == "🏦 Bank":
                         update_worksheet('Accounts', st.session_state.accounts)
                         st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
                         
-                        try:
-                            st.session_state['nav_radio'] = "🏠 Home"
-                        except:
-                            pass
                         st.session_state.page = "🏠 Home"
                         st.cache_data.clear()
                         st.rerun()
@@ -983,10 +971,6 @@ elif st.session_state.page == "🏦 Bank":
             st.cache_data.clear()
             st.success("✅ All account balances reset to ₹0!")
             
-            try:
-                st.session_state['nav_radio'] = "🏠 Home"
-            except:
-                pass
             st.session_state.page = "🏠 Home"
             st.rerun()
 
@@ -1329,10 +1313,6 @@ elif st.session_state.page == "⚡ More":
                     if error_msg:
                         st.error(error_msg)
                     
-                    try:
-                        st.session_state['nav_radio'] = "🏠 Home"
-                    except:
-                        pass
                     st.session_state.page = "🏠 Home"
                     st.cache_data.clear()
                     st.rerun()
