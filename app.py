@@ -617,25 +617,7 @@ if st.session_state.page == "🏠 Home":
     with col11:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_total)}</div><div class='sheet-card-sub'>All time</div></div>", unsafe_allow_html=True)
 
-    # Row 4: Net Worth History (6 months trend)
-    st.markdown("### 📈 Net Worth Trend")
-    if not df_tx.empty:
-        df_tx['Date'] = pd.to_datetime(df_tx['Date'])
-        df_tx['Month'] = df_tx['Date'].dt.to_period('M')
-        monthly_net = df_tx.groupby('Month').apply(lambda x: x[x['Type']=='Income']['Amount'].sum() - x[x['Type']=='Expense']['Amount'].sum()).reset_index()
-        monthly_net.columns = ['Month', 'Net Worth']
-        monthly_net['Month'] = monthly_net['Month'].astype(str)  # Fix for Plotly
-        if not st.session_state.investments.empty:
-            monthly_net['Net Worth'] += st.session_state.investments['Current Value'].sum()
-        if not st.session_state.emi.empty:
-            monthly_net['Net Worth'] -= st.session_state.emi['Remaining'].sum()
-        fig = px.line(monthly_net.tail(6), x='Month', y='Net Worth', title='Last 6 Months Net Worth')
-        fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#f0f2f6')
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Add transactions to see Net Worth trend.")
-
-    # Row 5: AI Insights Card
+    # Row 4: AI Insights Card
     st.markdown("### 🤖 AI Insights")
     col_ai1, col_ai2 = st.columns(2)
     with col_ai1:
@@ -656,7 +638,7 @@ if st.session_state.page == "🏠 Home":
         else:
             st.info("No income recorded yet.")
 
-    # Row 6: Recent Transactions
+    # Row 5: Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
     if not recent.empty:
@@ -664,7 +646,7 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No transactions yet.")
 
-    # Row 7: MANUAL SYNC BUTTON
+    # Row 6: MANUAL SYNC BUTTON
     st.markdown("---")
     col_sync1, col_sync2 = st.columns([3, 1])
     with col_sync1:
