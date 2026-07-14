@@ -2,23 +2,33 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 import json
 import re
 from datetime import datetime, timedelta
 import gspread
 from google.oauth2.service_account import Credentials
+import io
+import base64
+import pdfplumber
+import schedule
+import time
+import threading
+import smtplib
+from email.message import EmailMessage
+import requests
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- THEME TOGGLE (Dark/Light) ----------
+# ---------- THEME TOGGLE ----------
 if 'dark_theme' not in st.session_state:
     st.session_state.dark_theme = True
 
 def toggle_theme():
     st.session_state.dark_theme = not st.session_state.dark_theme
 
-# ---------- CSS (Neumorphic + Theme Support) FIXED ----------
+# ---------- CSS (Glassmorphism + Neumorphic + Bottom Nav) ----------
 theme_css = """
 <style>
     .stApp {{
@@ -27,16 +37,17 @@ theme_css = """
     }}
     .sheet-card {{
         background: {card_bg};
-        border-radius: 16px;
-        padding: 12px 16px;
-        margin-bottom: 12px;
+        border-radius: 20px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
         box-shadow: {card_shadow};
         border: 1px solid {card_border};
         text-align: center;
         transition: all 0.3s ease;
+        backdrop-filter: {blur};
     }}
     .sheet-card:hover {{
-        transform: translateY(-2px);
+        transform: translateY(-4px);
         box-shadow: {card_shadow_hover};
     }}
     .sheet-card-header {{
@@ -47,7 +58,7 @@ theme_css = """
         letter-spacing: 0.5px;
     }}
     .sheet-card-value {{
-        font-size: 1.4rem;
+        font-size: 1.6rem;
         font-weight: 700;
         color: {primary_color};
     }}
@@ -63,8 +74,9 @@ theme_css = """
         border: none;
         background: {primary_color};
         color: white;
-        padding: 10px 0;
+        padding: 12px 0;
         transition: 0.3s;
+        backdrop-filter: {blur};
     }}
     .stButton button:hover {{
         background: {primary_hover};
@@ -73,15 +85,65 @@ theme_css = """
     .stDataFrame {{ font-size: 0.8rem; }}
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
-    /* Mobile optimizations */
+    /* Fixed Bottom Navigation */
+    .bottom-nav {{
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: {nav_bg};
+        backdrop-filter: blur(12px);
+        padding: 10px 0;
+        display: flex;
+        justify-content: space-around;
+        border-top: 1px solid {nav_border};
+        z-index: 999;
+    }}
+    .nav-item {{
+        text-align: center;
+        font-size: 0.7rem;
+        color: {sub_text};
+        cursor: pointer;
+        transition: 0.2s;
+    }}
+    .nav-item.active {{
+        color: {primary_color};
+        font-weight: bold;
+    }}
+    /* FAB (Floating Action Button) */
+    .fab {{
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: {primary_color};
+        color: white;
+        font-size: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        z-index: 1000;
+        cursor: pointer;
+        transition: 0.3s;
+    }}
+    .fab:hover {{
+        transform: scale(1.1);
+        background: {primary_hover};
+    }}
+    /* Mobile responsive */
     @media (max-width: 768px) {{
-        .sheet-card {{ padding: 8px 10px; min-width: 60px; }}
-        .sheet-card-value {{ font-size: 1rem; }}
+        .sheet-card {{ padding: 10px 12px; min-width: 60px; }}
+        .sheet-card-value {{ font-size: 1.2rem; }}
         .stColumns {{ flex-wrap: wrap !important; }}
         .stColumn {{ flex: 1 1 45% !important; min-width: 60px; }}
     }}
     @media (max-width: 480px) {{
         .stColumn {{ flex: 1 1 100% !important; }}
+        .bottom-nav {{ padding: 8px 0; }}
+        .nav-item {{ font-size: 0.6rem; }}
     }}
 </style>
 """
@@ -89,25 +151,31 @@ if st.session_state.dark_theme:
     css = theme_css.format(
         bg_color="#0e1117",
         text_color="#f0f2f6",
-        card_bg="#1e2630",
-        card_shadow="0 6px 12px rgba(0,0,0,0.4)",
-        card_shadow_hover="0 10px 20px rgba(0,0,0,0.6)",
+        card_bg="rgba(30, 38, 48, 0.7)",
+        card_shadow="0 8px 16px rgba(0,0,0,0.4)",
+        card_shadow_hover="0 12px 24px rgba(0,0,0,0.6)",
         card_border="#2c3e50",
         sub_text="#94a3b8",
         primary_color="#00d4ff",
-        primary_hover="#00b0d4"
+        primary_hover="#00b0d4",
+        blur="blur(10px)",
+        nav_bg="rgba(14, 17, 23, 0.9)",
+        nav_border="#2c3e50"
     )
 else:
     css = theme_css.format(
         bg_color="#f1f3f6",
         text_color="#1e293b",
-        card_bg="#ffffff",
-        card_shadow="0 4px 12px rgba(0,0,0,0.05)",
-        card_shadow_hover="0 8px 24px rgba(0,0,0,0.08)",
+        card_bg="rgba(255, 255, 255, 0.6)",
+        card_shadow="0 8px 16px rgba(0,0,0,0.08)",
+        card_shadow_hover="0 12px 24px rgba(0,0,0,0.12)",
         card_border="#e2e8f0",
         sub_text="#64748b",
         primary_color="#2563eb",
-        primary_hover="#1d4ed8"
+        primary_hover="#1d4ed8",
+        blur="blur(10px)",
+        nav_bg="rgba(241, 243, 246, 0.9)",
+        nav_border="#e2e8f0"
     )
 st.markdown(css, unsafe_allow_html=True)
 
@@ -129,7 +197,7 @@ def get_gsheet_client():
         st.error(f"❌ Connection Error: {e}")
         return None
 
-# ---------- CACHED DATA LOAD (60 SECONDS TTL) ----------
+# ---------- CACHED DATA LOAD ----------
 @st.cache_data(ttl=60)
 def load_all_sheets():
     gc = get_gsheet_client()
@@ -138,7 +206,7 @@ def load_all_sheets():
     
     data = {}
     worksheet_names = ['Transactions', 'Budget', 'Accounts', 'Investments', 'EmiManager', 
-                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories', 'CustomNatures', 'Recurring']
+                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories', 'CustomNatures', 'Recurring', 'SplitExpenses']
     
     try:
         sh = gc.open(SHEET_NAME)
@@ -216,7 +284,6 @@ def update_settings(key, value):
 
 # ---------- RECURRING TRANSACTIONS PROCESSING ----------
 def process_recurring():
-    """Check if any recurring transaction is due today and add it."""
     recurring_df = st.session_state.get('recurring', pd.DataFrame())
     if recurring_df.empty:
         return
@@ -224,7 +291,6 @@ def process_recurring():
     for idx, row in recurring_df.iterrows():
         next_date = pd.to_datetime(row['NextDate']).date()
         if next_date <= today:
-            # Add transaction
             new_row = [today.strftime('%Y-%m-%d'), row['Description'], row['Category'], 
                        row['Amount'], row['Type'], row['Payment Mode'], '✅']
             st.session_state.transactions = pd.concat([st.session_state.transactions, 
@@ -238,7 +304,6 @@ def process_recurring():
                     'Status': '✅'
                 }])], ignore_index=True)
             append_to_worksheet('Transactions', new_row)
-            # Update next date based on frequency
             freq = row['Frequency']
             if freq == 'Daily':
                 next_date = today + timedelta(days=1)
@@ -249,13 +314,12 @@ def process_recurring():
             elif freq == 'Yearly':
                 next_date = today + timedelta(days=365)
             else:
-                next_date = today + timedelta(days=30)  # default
-            # Update recurring sheet
+                next_date = today + timedelta(days=30)
             recurring_df.at[idx, 'NextDate'] = next_date.strftime('%Y-%m-%d')
     update_worksheet('Recurring', recurring_df)
     st.session_state.recurring = recurring_df
 
-# ---------- AI CATEGORIZATION (Simple Keyword Mapping) ----------
+# ---------- AI CATEGORIZATION ----------
 AI_CATEGORY_MAP = {
     'zomato': 'Food',
     'swiggy': 'Food',
@@ -281,6 +345,78 @@ def ai_categorize(desc):
         if keyword in desc_lower:
             return category
     return 'Others'
+
+# ---------- SUBSCRIPTION DETECTIVE (Anomaly Analysis) ----------
+def detect_subscription_anomalies():
+    df = st.session_state.transactions
+    if df.empty:
+        return []
+    df['Date'] = pd.to_datetime(df['Date'])
+    df = df[df['Type'] == 'Expense']
+    if df.empty:
+        return []
+    # Find potential subscriptions: look for recurring descriptions
+    desc_counts = df['Description'].value_counts()
+    recurring_desc = desc_counts[desc_counts >= 2].index.tolist()
+    alerts = []
+    for desc in recurring_desc:
+        sub_df = df[df['Description'] == desc].sort_values('Date')
+        if len(sub_df) >= 2:
+            # Check price changes
+            prices = sub_df['Amount'].values
+            if len(prices) >= 2 and prices[-1] != prices[0]:
+                alerts.append(f"⚠️ AI Detective: {desc} price changed from ₹{prices[0]:.0f} to ₹{prices[-1]:.0f}.")
+    return alerts
+
+# ---------- SIP ADVISOR (Rule-based) ----------
+def get_sip_advice():
+    inv_df = st.session_state.investments
+    if inv_df.empty:
+        return "No investments found. Start your SIP today!"
+    total_invested = inv_df['Total Invested'].sum()
+    current_value = inv_df['Current Value'].sum()
+    if total_invested == 0:
+        return "No investment data available."
+    roi = (current_value / total_invested - 1) * 100
+    if roi < 5:
+        return "📉 Your average ROI is below 5%. Consider switching to a balanced mutual fund."
+    elif roi > 15:
+        return "📈 Great! Your investments are performing well. Keep it up!"
+    else:
+        return "✅ Your portfolio is on track. Maintain your SIPs."
+
+# ---------- FINANCIAL HEALTH SCORE ----------
+def calculate_health_score():
+    df = st.session_state.transactions
+    if df.empty:
+        return 50
+    monthly_inc = 0
+    monthly_exp = 0
+    current_month = datetime.now().strftime('%B')
+    if not df.empty:
+        df['Date'] = pd.to_datetime(df['Date'])
+        df_month = df[df['Date'].dt.month_name() == current_month]
+        monthly_inc = df_month[df_month['Type']=='Income']['Amount'].sum()
+        monthly_exp = df_month[df_month['Type']=='Expense']['Amount'].sum()
+    savings_rate = (monthly_inc - monthly_exp) / monthly_inc * 100 if monthly_inc > 0 else 0
+    # EMI-to-income ratio
+    total_emi = st.session_state.emi['EMI Amount'].sum() if not st.session_state.emi.empty else 0
+    emi_ratio = total_emi / monthly_inc * 100 if monthly_inc > 0 else 0
+    # Budget adherence
+    budget_df = st.session_state.budget
+    total_budget = budget_df['Current Month Budget'].sum()
+    total_spent = budget_df['Actual This Month'].sum()
+    budget_adherence = (total_spent / total_budget * 100) if total_budget > 0 else 100
+    # Diversification (investments)
+    inv_df = st.session_state.investments
+    diversification = 0
+    if not inv_df.empty:
+        # Check if at least two types exist
+        if len(inv_df['Type'].unique()) >= 2:
+            diversification = 100
+    # Weighted score
+    score = (savings_rate * 0.2) + (100 - min(emi_ratio, 50) * 0.3) + (100 - min(budget_adherence, 150) * 0.2) + (diversification * 0.3)
+    return max(0, min(100, score))
 
 # ---------- SESSION STATE ----------
 def init_session_state():
@@ -393,7 +529,14 @@ def init_session_state():
     else:
         st.session_state.recurring = loaded
 
-    # Process recurring transactions
+    # 13. SplitExpenses
+    loaded = all_data.get('SplitExpenses', pd.DataFrame())
+    if loaded.empty:
+        st.session_state.split_expenses = pd.DataFrame(columns=['Date','Description','Total Amount','Paid By','Shared With','My Share','Status'])
+    else:
+        st.session_state.split_expenses = loaded
+
+    # Process recurring
     process_recurring()
 
 if 'initialized' not in st.session_state:
@@ -435,6 +578,7 @@ def force_sync():
         update_worksheet('CustomCategories', st.session_state.custom_categories)
         update_worksheet('CustomNatures', st.session_state.custom_natures)
         update_worksheet('Recurring', st.session_state.recurring)
+        update_worksheet('SplitExpenses', st.session_state.split_expenses)
         
         sync_time = datetime.now().strftime("%d %b %Y, %H:%M:%S")
         update_settings('last_sync_time', sync_time)
@@ -453,18 +597,94 @@ def export_transactions_csv():
     csv = df.to_csv(index=False).encode('utf-8')
     return csv
 
+# ---------- BULK SMS/STATEMENT PARSER (DeepSeek placeholder) ----------
+def bulk_parse_text(text):
+    # Placeholder: use DeepSeek API or rule-based parsing
+    # For now, we'll split by newline and assume each line is a transaction
+    lines = text.strip().split('\n')
+    transactions = []
+    for line in lines:
+        parts = line.split('\t')  # assume tab-separated
+        if len(parts) >= 4:
+            try:
+                date = parts[0].strip()
+                desc = parts[1].strip()
+                amount = float(parts[2].strip())
+                ttype = parts[3].strip()
+                transactions.append([date, desc, amount, ttype])
+            except:
+                continue
+    return transactions
+
+# ---------- VOICE RECORDING (using streamlit-mic-recorder) ----------
+try:
+    from streamlit_mic_recorder import mic_recorder
+    voice_enabled = True
+except ImportError:
+    voice_enabled = False
+
+# ---------- PDF BANK STATEMENT IMPORTER ----------
+def parse_pdf_transactions(pdf_file):
+    transactions = []
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            # Simple parsing: assume each line is a transaction
+            lines = text.split('\n')
+            for line in lines:
+                # Heuristic: look for date pattern and amount
+                match = re.search(r'(\d{2}/\d{2}/\d{4})\s+(.*?)\s+([\d,]+\.\d{2})', line)
+                if match:
+                    date = match.group(1)
+                    desc = match.group(2)
+                    amount = float(match.group(3).replace(',', ''))
+                    transactions.append([date, desc, amount, 'Expense'])
+    return transactions
+
+# ---------- BACKGROUND EMAIL/TELEGRAM (AI Smart Digest) ----------
+def send_daily_digest():
+    # This function will be called by a background thread
+    # You need to set up your email/telegram credentials
+    subject = "Daily Finance Digest from CashDash"
+    body = generate_digest_content()
+    # send email or telegram
+    # ...
+    pass
+
+def generate_digest_content():
+    df = st.session_state.transactions
+    if df.empty:
+        return "No transactions today."
+    today = datetime.now().date()
+    df_today = df[pd.to_datetime(df['Date']).dt.date == today]
+    total_spent = df_today[df_today['Type']=='Expense']['Amount'].sum()
+    total_income = df_today[df_today['Type']=='Income']['Amount'].sum()
+    msg = f"📊 Daily Digest for {today}\n\n"
+    msg += f"💰 Today's Income: ₹{total_income:.0f}\n"
+    msg += f"💸 Today's Expenses: ₹{total_spent:.0f}\n"
+    if total_spent > 0:
+        msg += f"📈 Top category: {df_today[df_today['Type']=='Expense'].groupby('Category')['Amount'].sum().idxmax()}\n"
+    return msg
+
 # ---------- APP UI ----------
 st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
 
-# Theme Toggle
-col_toggle, _ = st.columns([1, 4])
+# Theme Toggle & Notifications
+col_toggle, col_notif = st.columns([1, 4])
 with col_toggle:
     if st.button("🌓 Toggle Theme", key="theme_toggle"):
         toggle_theme()
         st.rerun()
+with col_notif:
+    # Show subscription alerts if any
+    alerts = detect_subscription_anomalies()
+    for alert in alerts:
+        st.warning(alert)
 
-# Radio Navigation with proper state management
+# Fixed Bottom Navigation (using custom HTML)
+# We'll use a simple radio for now, but we can replace with HTML later
+# For simplicity, keep radio but we'll update CSS for bottom nav
 nav = st.radio(
     "Menu",
     ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"],
@@ -521,7 +741,7 @@ if st.session_state.page == "🏠 Home":
     # BC stats
     bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
 
-    # Hand Loan stats (using custom type: we will treat any transaction with Type "Hand Loan" as outstanding)
+    # Hand Loan stats
     if not df_tx.empty:
         handloan_income = df_tx[(df_tx['Type'] == 'Hand Loan') & (df_tx['Type'] == 'Income')]['Amount'].sum()
         handloan_expense = df_tx[(df_tx['Type'] == 'Hand Loan') & (df_tx['Type'] == 'Expense')]['Amount'].sum()
@@ -529,6 +749,9 @@ if st.session_state.page == "🏠 Home":
     else:
         handloan_outstanding = 0
 
+    # Financial Health Score
+    health_score = calculate_health_score()
+    
     # Row 1: Accounts
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -567,7 +790,24 @@ if st.session_state.page == "🏠 Home":
     with col11:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_total)}</div><div class='sheet-card-sub'>All time</div></div>", unsafe_allow_html=True)
 
-    # Row 4: Recent Transactions
+    # Row 4: Health Score Gauge
+    st.markdown("### 🏥 Financial Health Score")
+    fig_gauge = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = health_score,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': "Health Score"},
+        gauge = {'axis': {'range': [None, 100]},
+                 'bar': {'color': "#00d4ff" if health_score >= 70 else "#ffa500" if health_score >= 50 else "#ff4444"},
+                 'steps': [
+                     {'range': [0, 50], 'color': "lightgray"},
+                     {'range': [50, 80], 'color': "gray"},
+                     {'range': [80, 100], 'color': "lightgreen"}],
+                 'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 90}}))
+    fig_gauge.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=20))
+    st.plotly_chart(fig_gauge, use_container_width=True)
+
+    # Row 5: Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
     if not recent.empty:
@@ -575,7 +815,7 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No transactions yet.")
 
-    # Row 5: MANUAL SYNC BUTTON
+    # Row 6: MANUAL SYNC BUTTON
     st.markdown("---")
     col_sync1, col_sync2 = st.columns([3, 1])
     with col_sync1:
@@ -587,6 +827,23 @@ if st.session_state.page == "🏠 Home":
                 st.error(msg)
     with col_sync2:
         st.markdown(f"<div style='text-align:right; font-size:0.7rem; color:#94a3b8;'>Last synced: {st.session_state.last_sync_time}</div>", unsafe_allow_html=True)
+
+    # Row 7: AI Advisor (SIP Advice)
+    st.markdown("### 🤖 AI Advisor")
+    advice = get_sip_advice()
+    st.info(advice)
+
+    # Row 8: What-If Goal Simulator (Placeholder)
+    st.markdown("### 🎯 Goal Simulator")
+    with st.expander("Try our Goal Simulator"):
+        goal_input = st.text_input("What do you want to achieve? (e.g., Buy a car worth ₹8 Lakhs by Diwali)")
+        if st.button("Simulate"):
+            # Placeholder: In real, you'd call DeepSeek API
+            st.write("🧠 Simulating... (DeepSeek integration placeholder)")
+            st.write("Based on your current savings rate, you need to save ₹X per month to achieve this goal by Diwali.")
+            st.write("📊 Here's a suggested savings plan:")
+            fig = px.bar(x=["Monthly Savings", "Current Savings"], y=[15000, 12000], title="Goal Progress")
+            st.plotly_chart(fig, use_container_width=True)
 
 # ===================== ADD TRANSACTION =====================
 elif st.session_state.page == "➕ Add":
@@ -645,6 +902,12 @@ elif st.session_state.page == "➕ Add":
         
         payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
     
+    # Split-Wise fields
+    is_split = st.checkbox("Split this expense with someone?")
+    split_person = None
+    if is_split and ttype == "Expense":
+        split_person = st.text_input("Who did you share this with? (e.g., Anis)")
+    
     # Transfer fields
     from_acc = None
     to_acc = None
@@ -696,13 +959,12 @@ elif st.session_state.page == "➕ Add":
                 desc = f"Fuel - {f_litres:.1f} L, {f_dist:.1f} km"
             else:
                 desc = f"Fuel - {f_litres:.1f} L"
-    
-    # AI Categorization: if description is entered and category is empty, suggest
+
+    # AI Categorization
     if desc and not category:
         suggested = ai_categorize(desc)
         if suggested != 'Others':
             st.info(f"🤖 Suggested category: {suggested}")
-            # We can auto-select but we leave user to choose.
     
     if st.button("✅ Add Transaction", key="submit_btn"):
         success_msg = None
@@ -790,6 +1052,22 @@ elif st.session_state.page == "➕ Add":
                     current_actual = st.session_state.budget.loc[cat_idx, 'Actual This Month']
                     st.session_state.budget.loc[cat_idx, 'Actual This Month'] = current_actual + amount
                     update_worksheet('Budget', st.session_state.budget)
+
+            # 8. Split-Wise
+            if is_split and split_person and ttype == "Expense":
+                split_amount = amount / 2  # simple split
+                split_row = [date.strftime('%Y-%m-%d'), desc, amount, split_person, split_person, split_amount, 'Pending']
+                split_df = pd.DataFrame([{
+                    'Date': date.strftime('%Y-%m-%d'),
+                    'Description': desc,
+                    'Total Amount': amount,
+                    'Paid By': split_person,
+                    'Shared With': split_person,
+                    'My Share': split_amount,
+                    'Status': 'Pending'
+                }])
+                st.session_state.split_expenses = pd.concat([st.session_state.split_expenses, split_df], ignore_index=True)
+                update_worksheet('SplitExpenses', st.session_state.split_expenses)
             
             success_msg = "✅ Transaction Saved Successfully! (Balances, Budget, EMI, Fuel, Investments updated)"
         except Exception as e:
@@ -800,7 +1078,6 @@ elif st.session_state.page == "➕ Add":
         if error_msg:
             st.error(error_msg)
         
-        # 🛠️ FIX: Safely switch to Home and refresh without touching radio key
         st.session_state.page = "🏠 Home"
         st.cache_data.clear()
         st.rerun()
@@ -894,7 +1171,6 @@ elif st.session_state.page == "➕ Add":
             if error_msg:
                 st.error(error_msg)
             
-            # 🛠️ FIX: Safely switch to Home and refresh
             st.session_state.page = "🏠 Home"
             st.cache_data.clear()
             st.rerun()
@@ -927,6 +1203,12 @@ elif st.session_state.page == "🎯 Budget":
         status_color = "#10b981" if remaining_val >= 0 else "#ef4444"
         status_text = "✅ On Track" if remaining_val >= 0 else "⚠️ Over Budget"
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>✅ Remaining</div><div class='sheet-card-value' style='color:{status_color};'>{format_currency(remaining_val)}</div><div class='sheet-card-sub'>{status_text}</div></div>", unsafe_allow_html=True)
+
+    # Donut Chart for Budget
+    st.markdown("### 📊 Budget Distribution")
+    fig = px.pie(df, names='Category', values='Current Month Budget', hole=0.5, title="Budget Allocation")
+    fig.update_layout(margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("✏️ Set Overall Monthly Budget Cap"):
         new_master = st.number_input("Enter your ideal monthly budget cap (₹)", value=master_budget, step=500.0)
@@ -975,7 +1257,7 @@ elif st.session_state.page == "🎯 Budget":
             st.info("No categories to delete.")
 
         st.markdown("---")
-        st.markdown("### ✏️ Edit Category (Actual This Month auto-updates from Transactions)")
+        st.markdown("### ✏️ Edit Category (Actual This Month auto-updates)")
         new_cat = st.text_input("New Category Name (Leave blank to edit existing)")
         sel_cat = st.selectbox("Or select existing to edit", df['Category'].tolist() + ["New"])
         
@@ -1018,7 +1300,6 @@ elif st.session_state.page == "🏦 Bank":
             if amt_add > 0:
                 idx = st.session_state.accounts[st.session_state.accounts['Account'] == acc_add].index[0]
                 st.session_state.accounts.loc[idx, 'Balance'] += amt_add
-                # Create transaction
                 new_row = [datetime.now().strftime('%Y-%m-%d'), desc_add, "Deposit", amt_add, "Income", acc_add, '✅']
                 new_df = pd.DataFrame([{
                     'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_add, 'Category': "Deposit",
@@ -1028,7 +1309,6 @@ elif st.session_state.page == "🏦 Bank":
                 append_to_worksheet('Transactions', new_row)
                 update_worksheet('Accounts', st.session_state.accounts)
                 st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
-                
                 st.session_state.page = "🏠 Home"
                 st.cache_data.clear()
                 st.rerun()
@@ -1046,7 +1326,6 @@ elif st.session_state.page == "🏦 Bank":
                 current_bal = st.session_state.accounts.loc[idx, 'Balance']
                 if current_bal >= amt_with:
                     st.session_state.accounts.loc[idx, 'Balance'] -= amt_with
-                    # Create transaction
                     new_row = [datetime.now().strftime('%Y-%m-%d'), desc_with, "Withdrawal", amt_with, "Expense", acc_with, '✅']
                     new_df = pd.DataFrame([{
                         'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_with, 'Category': "Withdrawal",
@@ -1056,7 +1335,6 @@ elif st.session_state.page == "🏦 Bank":
                     append_to_worksheet('Transactions', new_row)
                     update_worksheet('Accounts', st.session_state.accounts)
                     st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
-                    
                     st.session_state.page = "🏠 Home"
                     st.cache_data.clear()
                     st.rerun()
@@ -1082,7 +1360,6 @@ elif st.session_state.page == "🏦 Bank":
                         to_idx = st.session_state.accounts[st.session_state.accounts['Account'] == to_acc].index[0]
                         st.session_state.accounts.loc[from_idx, 'Balance'] -= amt_trans
                         st.session_state.accounts.loc[to_idx, 'Balance'] += amt_trans
-                        # Create transaction
                         new_row = [datetime.now().strftime('%Y-%m-%d'), f"{desc_trans} (From {from_acc} to {to_acc})", "Transfer", amt_trans, "Transfer", f"{from_acc} -> {to_acc}", '✅']
                         new_df = pd.DataFrame([{
                             'Date': datetime.now().strftime('%Y-%m-%d'), 
@@ -1097,7 +1374,6 @@ elif st.session_state.page == "🏦 Bank":
                         append_to_worksheet('Transactions', new_row)
                         update_worksheet('Accounts', st.session_state.accounts)
                         st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
-                        
                         st.session_state.page = "🏠 Home"
                         st.cache_data.clear()
                         st.rerun()
@@ -1115,14 +1391,13 @@ elif st.session_state.page == "🏦 Bank":
             update_worksheet('Accounts', st.session_state.accounts)
             st.cache_data.clear()
             st.success("✅ All account balances reset to ₹0!")
-            
             st.session_state.page = "🏠 Home"
             st.rerun()
 
 # ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "⚙️ Customization", "📋 All Transactions", "🔄 Recurring"])
+    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "⚙️ Customization", "📋 All Transactions", "🔄 Recurring", "🤖 AI Assistant", "📂 Bulk Import", "🎤 Voice Log", "📄 PDF Import", "🧾 Split-Wise"])
     
     # ---------- Investments ----------
     with tabs[0]:
@@ -1202,7 +1477,7 @@ elif st.session_state.page == "⚡ More":
                 st.success("Goal Deleted!")
                 st.rerun()
     
-    # ---------- Reports (with Export CSV) ----------
+    # ---------- Reports ----------
     with tabs[3]:
         st.markdown("### 📊 Monthly Analysis")
         df = st.session_state.transactions
@@ -1245,7 +1520,7 @@ elif st.session_state.page == "⚡ More":
                 fig4.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig4, use_container_width=True)
             
-            # 5. Investment (SIP+Gold)
+            # 5. Investment
             inv_df = st.session_state.investments
             if not inv_df.empty:
                 total_inv = inv_df[inv_df['Name'].str.upper().isin(['SIP','GOLD'])]['Total Invested'].sum()
@@ -1267,7 +1542,7 @@ elif st.session_state.page == "⚡ More":
                 fig6.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='#f1f3f6', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig6, use_container_width=True)
             
-            # Export CSV Button
+            # Export CSV
             st.markdown("### 📥 Export Data")
             csv_data = export_transactions_csv()
             if csv_data:
@@ -1403,7 +1678,7 @@ elif st.session_state.page == "⚡ More":
                         amount = tx['Amount']
                         payment_mode = tx['Payment Mode']
                         
-                        # Reverse budget, EMI, Investment, Fuel, Account Balance (same logic)
+                        # Reverse logic same as before
                         if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
                             cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                             st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
@@ -1477,7 +1752,7 @@ elif st.session_state.page == "⚡ More":
         else:
             st.info("No transactions yet.")
     
-    # ---------- Recurring Transactions ----------
+    # ---------- Recurring ----------
     with tabs[6]:
         st.markdown("### 🔄 Recurring Transactions")
         st.info("Add transactions that repeat daily, weekly, or monthly. They will be auto-added on their due date.")
@@ -1520,3 +1795,121 @@ elif st.session_state.page == "⚡ More":
                 st.cache_data.clear()
                 st.success("Recurring deleted!")
                 st.rerun()
+    
+    # ---------- AI Assistant ----------
+    with tabs[7]:
+        st.markdown("### 🤖 AI Assistant")
+        st.info("Ask me anything about your finances. I can analyze your spending, suggest budgets, and more.")
+        
+        # Simple rule-based chatbot
+        user_input = st.text_input("Ask a question:", placeholder="E.g., How much did I spend on groceries this month?")
+        if user_input:
+            # Simple keyword-based response
+            response = ""
+            if "spend" in user_input.lower() and "groceries" in user_input.lower():
+                df = st.session_state.transactions
+                current_month = datetime.now().strftime('%B')
+                if not df.empty:
+                    df['Date'] = pd.to_datetime(df['Date'])
+                    df_month = df[df['Date'].dt.month_name() == current_month]
+                    groceries = df_month[df_month['Category'] == 'Groceries']['Amount'].sum()
+                    response = f"💰 You've spent ₹{groceries:.0f} on groceries this month."
+                else:
+                    response = "No transaction data available yet."
+            elif "salary" in user_input.lower():
+                df = st.session_state.transactions
+                current_month = datetime.now().strftime('%B')
+                if not df.empty:
+                    df['Date'] = pd.to_datetime(df['Date'])
+                    df_month = df[df['Date'].dt.month_name() == current_month]
+                    salary = df_month[df_month['Category'] == 'Salary']['Amount'].sum()
+                    response = f"📈 Your total salary this month: ₹{salary:.0f}"
+                else:
+                    response = "No salary data yet."
+            else:
+                response = "I'm still learning. Try asking about specific expenses, income, or budget."
+            st.write(f"🤖 {response}")
+    
+    # ---------- Bulk Import ----------
+    with tabs[8]:
+        st.markdown("### 📂 Bulk Import from Statement/SMS")
+        st.info("Paste your bank statement or SMS transactions below (one per line, tab-separated: Date\tDescription\tAmount\tType).")
+        bulk_text = st.text_area("Paste statement text here", height=200)
+        if st.button("Import Bulk Transactions"):
+            if bulk_text:
+                parsed = bulk_parse_text(bulk_text)
+                if parsed:
+                    for txn in parsed:
+                        new_row = [txn[0], txn[1], txn[2], txn[3], "Expense", "Cash", '✅']
+                        append_to_worksheet('Transactions', new_row)
+                    st.success(f"✅ Imported {len(parsed)} transactions!")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("No valid transactions found. Please check format.")
+            else:
+                st.error("Please paste some text.")
+    
+    # ---------- Voice Log ----------
+    with tabs[9]:
+        st.markdown("### 🎤 Voice Expense Logging")
+        if voice_enabled:
+            st.info("Click the microphone and speak your transaction (e.g., '500 rupees for groceries').")
+            audio = mic_recorder(start_prompt="Start Recording", stop_prompt="Stop Recording")
+            if audio:
+                st.audio(audio['data'], format='audio/wav')
+                # Placeholder: send to DeepSeek for transcription
+                st.info("🎙️ Audio recorded. (Transcription integration placeholder)")
+                # In real implementation, you'd call DeepSeek/Whisper API here.
+        else:
+            st.warning("streamlit-mic-recorder not installed. Please install it for voice support.")
+    
+    # ---------- PDF Import ----------
+    with tabs[10]:
+        st.markdown("### 📄 Import Bank Statement PDF")
+        st.info("Upload your bank statement PDF to automatically import transactions.")
+        pdf_file = st.file_uploader("Choose a PDF file", type=['pdf'])
+        if pdf_file is not None:
+            if st.button("Parse PDF and Import"):
+                with st.spinner("Parsing PDF..."):
+                    parsed = parse_pdf_transactions(pdf_file)
+                    if parsed:
+                        for txn in parsed:
+                            new_row = [txn[0], txn[1], txn[2], txn[3], "Expense", "Cash", '✅']
+                            append_to_worksheet('Transactions', new_row)
+                        st.success(f"✅ Imported {len(parsed)} transactions from PDF!")
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.error("No transactions found in PDF. Please ensure the format is standard.")
+    
+    # ---------- Split-Wise ----------
+    with tabs[11]:
+        st.markdown("### 🧾 Split-Wise Expense Sharing")
+        st.info("Track shared expenses with friends and family.")
+        split_df = st.session_state.split_expenses
+        if not split_df.empty:
+            st.dataframe(split_df, hide_index=True, use_container_width=True)
+        else:
+            st.info("No split expenses yet.")
+        # Add option to settle
+        if not split_df.empty:
+            selected = st.selectbox("Select an expense to settle", split_df.index)
+            if st.button("✅ Mark as Settled"):
+                split_df.loc[selected, 'Status'] = 'Settled'
+                update_worksheet('SplitExpenses', split_df)
+                st.session_state.split_expenses = split_df
+                st.cache_data.clear()
+                st.success("Marked as settled!")
+                st.rerun()
+
+# ---------- START BACKGROUND THREAD FOR DAILY DIGEST (if enabled) ----------
+# This is a placeholder – you would implement this in a separate script or use a cron job.
+# For Streamlit Cloud, you might need to use a separate service.
+# Uncomment below if you have a background thread (not recommended for shared hosting)
+# def start_digest_thread():
+#     schedule.every().day.at("08:00").do(send_daily_digest)
+#     while True:
+#         schedule.run_pending()
+#         time.sleep(60)
+# threading.Thread(target=start_digest_thread, daemon=True).start()
