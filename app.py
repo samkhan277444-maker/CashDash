@@ -12,20 +12,19 @@ from google.oauth2.service_account import Credentials
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- THEME TOGGLE LOGIC ----------
+# ---------- THEME TOGGLE ----------
 if 'theme' not in st.session_state:
-    st.session_state.theme = 'dark'  # default theme
+    st.session_state.theme = 'dark'
 
-# Define color palettes for Dark and Light modes
 THEMES = {
     'dark': {
         'bg': '#0f111a', 'text': '#f0f2f6', 'card': 'rgba(30, 35, 45, 0.6)',
-        'border': 'rgba(255,255,255,0.08)', 'sub': '#94a3b8', 'primary': '#00d4ff', 
+        'border': 'rgba(255,255,255,0.08)', 'sub': '#94a3b8', 'primary': '#00d4ff',
         'hover': '#00b0d4', 'btn_text': '#0f111a', 'shadow': '0 8px 32px rgba(0,0,0,0.5)'
     },
     'light': {
         'bg': '#f5f7fa', 'text': '#1e293b', 'card': 'rgba(255, 255, 255, 0.75)',
-        'border': '#e2e8f0', 'sub': '#64748b', 'primary': '#1a73e8', 
+        'border': '#e2e8f0', 'sub': '#64748b', 'primary': '#1a73e8',
         'hover': '#1557b0', 'btn_text': '#ffffff', 'shadow': '0 4px 12px rgba(0,0,0,0.05)'
     }
 }
@@ -205,7 +204,7 @@ def update_settings(key, value):
     except Exception as e:
         st.warning(f"Could not update settings: {e}")
 
-# ---------- AI SUBSCRIPTION DETECTIVE (Telecom + General) ----------
+# ---------- AI SUBSCRIPTION DETECTIVE ----------
 def detect_subscription_anomalies():
     df = st.session_state.transactions
     if df.empty:
@@ -232,7 +231,6 @@ def detect_subscription_anomalies():
 
 # ---------- DAILY AUTO ENTRIES (Gold + SIP Axis) ----------
 def add_daily_auto_entries():
-    """Add ₹20 Daily Gold and ₹10 SIP Axis Gold if not already added today."""
     today = datetime.now().strftime('%Y-%m-%d')
     df = st.session_state.transactions
     if df.empty:
@@ -284,6 +282,64 @@ def add_daily_auto_entries():
                 'Amount': 10, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
             }])
             st.session_state.transactions = pd.concat([df, new_row], ignore_index=True)
+
+# ---------- AI CATEGORIZATION ----------
+def ai_categorize(desc):
+    desc_lower = desc.lower()
+    keywords = {
+        'zomato': 'Food', 'swiggy': 'Food', 'uber': 'Transport', 'ola': 'Transport',
+        'amazon': 'Shopping', 'flipkart': 'Shopping', 'netflix': 'Entertainment',
+        'spotify': 'Entertainment', 'rent': 'Rent', 'salary': 'Salary', 'emi': 'EMI',
+        'fuel': 'Fuel', 'groceries': 'Groceries', 'vegetables': 'Vegetables',
+        'mobile': 'Mobile Recharge', 'electricity': 'Utilities', 'water': 'Utilities'
+    }
+    for keyword, category in keywords.items():
+        if keyword in desc_lower:
+            return category
+    return 'Others'
+
+# ---------- AI ASSISTANT (Rule-based Chatbot) ----------
+def ai_assistant_response(query):
+    df = st.session_state.transactions
+    if df.empty:
+        return "No transaction data available yet. Please add some transactions first."
+    current_month = datetime.now().strftime('%B')
+    df['Date'] = pd.to_datetime(df['Date'])
+    df_month = df[df['Date'].dt.month_name() == current_month]
+    
+    query = query.lower()
+    if "spend" in query and "groceries" in query:
+        amt = df_month[df_month['Category'] == 'Groceries']['Amount'].sum()
+        return f"💰 You've spent ₹{amt:.0f} on groceries this month."
+    elif "salary" in query:
+        amt = df_month[df_month['Category'] == 'Salary']['Amount'].sum()
+        return f"📈 Your total salary this month: ₹{amt:.0f}"
+    elif "total expense" in query or "expense" in query:
+        amt = df_month[df_month['Type'] == 'Expense']['Amount'].sum()
+        return f"📉 Your total expenses this month: ₹{amt:.0f}"
+    elif "total income" in query or "income" in query:
+        amt = df_month[df_month['Type'] == 'Income']['Amount'].sum()
+        return f"📈 Your total income this month: ₹{amt:.0f}"
+    elif "savings" in query:
+        inc = df_month[df_month['Type'] == 'Income']['Amount'].sum()
+        exp = df_month[df_month['Type'] == 'Expense']['Amount'].sum()
+        savings = inc - exp
+        return f"💎 Your savings this month: ₹{savings:.0f}"
+    elif "emi" in query:
+        emi_df = st.session_state.emi
+        if emi_df.empty:
+            return "No EMI loans found."
+        total_emi = emi_df['EMI Amount'].sum()
+        return f"🏦 Your total monthly EMI: ₹{total_emi:.0f}"
+    elif "investment" in query or "invest" in query:
+        inv_df = st.session_state.investments
+        if inv_df.empty:
+            return "No investments found."
+        total_inv = inv_df['Total Invested'].sum()
+        curr_val = inv_df['Current Value'].sum()
+        return f"📈 Total invested: ₹{total_inv:.0f}, Current value: ₹{curr_val:.0f}"
+    else:
+        return "I can help with: spending, income, savings, EMI, investments, or categories like groceries, salary, etc. Try asking me something specific!"
 
 # ---------- SESSION STATE ----------
 def init_session_state():
@@ -529,17 +585,15 @@ if st.session_state.page == "🏠 Home":
     with col11:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_total)}</div><div class='sheet-card-sub'>All time</div></div>", unsafe_allow_html=True)
 
-       # Row 4: Net Worth History (6 months trend)
+    # Row 4: Net Worth History (6 months trend) - FIXED
     st.markdown("### 📈 Net Worth Trend")
     if not df_tx.empty:
         df_tx['Date'] = pd.to_datetime(df_tx['Date'])
         df_tx['Month'] = df_tx['Date'].dt.to_period('M')
         monthly_net = df_tx.groupby('Month').apply(lambda x: x[x['Type']=='Income']['Amount'].sum() - x[x['Type']=='Expense']['Amount'].sum()).reset_index()
         monthly_net.columns = ['Month', 'Net Worth']
-        
         # 🛡️ FIX: Convert Period to string for Plotly JSON serialization
         monthly_net['Month'] = monthly_net['Month'].astype(str)
-        
         # Add Investments and subtract EMI
         if not st.session_state.investments.empty:
             monthly_net['Net Worth'] += st.session_state.investments['Current Value'].sum()
@@ -550,7 +604,31 @@ if st.session_state.page == "🏠 Home":
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Add transactions to see Net Worth trend.")
-    # Row 5: Recent Transactions
+
+    # Row 5: AI Insights Card
+    st.markdown("### 🤖 AI Insights")
+    col_ai1, col_ai2 = st.columns(2)
+    with col_ai1:
+        # Top spending category
+        if not df_tx.empty:
+            top_exp = df_month[df_month['Type']=='Expense'].groupby('Category')['Amount'].sum().sort_values(ascending=False).head(1)
+            if not top_exp.empty:
+                top_cat = top_exp.index[0]
+                top_amt = top_exp.values[0]
+                st.info(f"📊 Your top spending category this month is **{top_cat}** (₹{top_amt:.0f}).")
+            else:
+                st.info("No expenses yet.")
+        else:
+            st.info("Add transactions to see insights.")
+    with col_ai2:
+        # Savings rate
+        if monthly_inc > 0:
+            rate = (savings / monthly_inc) * 100
+            st.info(f"💎 Your savings rate this month is **{rate:.1f}%**.")
+        else:
+            st.info("No income recorded yet.")
+
+    # Row 6: Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
     if not recent.empty:
@@ -558,7 +636,7 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No transactions yet.")
 
-    # Row 6: MANUAL SYNC BUTTON
+    # Row 7: MANUAL SYNC BUTTON
     st.markdown("---")
     col_sync1, col_sync2 = st.columns([3, 1])
     with col_sync1:
@@ -1086,10 +1164,10 @@ elif st.session_state.page == "🏦 Bank":
             st.session_state.page = "🏠 Home"
             st.rerun()
 
-# ===================== MORE (Premium Modules) =====================
+# ===================== MORE (Premium Modules + AI Assistant) =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports"])
+    tabs = st.tabs(["📈 Investments", "🏦 EMI", "🎯 Goals", "📊 Reports", "🤖 AI Assistant"])
     
     # ---------- Investments ----------
     with tabs[0]:
@@ -1235,3 +1313,15 @@ elif st.session_state.page == "⚡ More":
                 st.plotly_chart(fig6, use_container_width=True)
         else:
             st.info("Add some transactions to see detailed reports.")
+    
+    # ---------- AI Assistant ----------
+    with tabs[4]:
+        st.markdown("### 🤖 AI Assistant")
+        st.info("Ask me anything about your finances. I can analyze your spending, suggest budgets, and more.")
+        
+        user_query = st.text_input("Ask a question:", placeholder="E.g., How much did I spend on groceries this month?")
+        if user_query:
+            response = ai_assistant_response(user_query)
+            st.success(f"🤖 {response}")
+        else:
+            st.write("💡 Try asking: 'How much did I spend on groceries?', 'What is my total expense?', 'How much savings do I have?' etc.")
