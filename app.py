@@ -229,59 +229,29 @@ def detect_subscription_anomalies():
                     alerts.append(f"⚠️ AI Detective: {desc} charges changed from ₹{prices[0]:.0f} to ₹{prices[-1]:.0f}.")
     return alerts
 
-# ---------- DAILY AUTO ENTRIES (Gold + SIP Axis) ----------
-def add_daily_auto_entries():
-    today = datetime.now().strftime('%Y-%m-%d')
-    df = st.session_state.transactions
-    if df.empty:
-        rows = [
-            [today, "Daily Gold Saving", "Gold", 20, "Investment", "Cash", '✅'],
-            [today, "Axis Gold Fund (SIP)", "SIP", 10, "Investment", "Cash", '✅']
-        ]
-        for row in rows:
-            append_to_worksheet('Transactions', row)
-        new_df = pd.DataFrame([{
-            'Date': today, 'Description': "Daily Gold Saving", 'Category': "Gold",
-            'Amount': 20, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-        }, {
-            'Date': today, 'Description': "Axis Gold Fund (SIP)", 'Category': "SIP",
-            'Amount': 10, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-        }])
-        st.session_state.transactions = pd.concat([df, new_df], ignore_index=True)
+# ---------- CLEANUP AUTO ENTRIES (Gold + SIP Axis) ----------
+def cleanup_auto_entries():
+    """Delete all previously auto-added 'Daily Gold Saving' and 'Axis Gold Fund (SIP)' entries."""
+    if 'auto_entries_cleaned' in st.session_state:
         return
-    today_df = df[df['Date'] == today]
-    if today_df.empty:
-        rows = [
-            [today, "Daily Gold Saving", "Gold", 20, "Investment", "Cash", '✅'],
-            [today, "Axis Gold Fund (SIP)", "SIP", 10, "Investment", "Cash", '✅']
-        ]
-        for row in rows:
-            append_to_worksheet('Transactions', row)
-        new_df = pd.DataFrame([{
-            'Date': today, 'Description': "Daily Gold Saving", 'Category': "Gold",
-            'Amount': 20, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-        }, {
-            'Date': today, 'Description': "Axis Gold Fund (SIP)", 'Category': "SIP",
-            'Amount': 10, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-        }])
-        st.session_state.transactions = pd.concat([df, new_df], ignore_index=True)
-    else:
-        if not any(today_df['Description'] == "Daily Gold Saving"):
-            row = [today, "Daily Gold Saving", "Gold", 20, "Investment", "Cash", '✅']
-            append_to_worksheet('Transactions', row)
-            new_row = pd.DataFrame([{
-                'Date': today, 'Description': "Daily Gold Saving", 'Category': "Gold",
-                'Amount': 20, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-            }])
-            st.session_state.transactions = pd.concat([df, new_row], ignore_index=True)
-        if not any(today_df['Description'] == "Axis Gold Fund (SIP)"):
-            row = [today, "Axis Gold Fund (SIP)", "SIP", 10, "Investment", "Cash", '✅']
-            append_to_worksheet('Transactions', row)
-            new_row = pd.DataFrame([{
-                'Date': today, 'Description': "Axis Gold Fund (SIP)", 'Category': "SIP",
-                'Amount': 10, 'Type': "Investment", 'Payment Mode': "Cash", 'Status': '✅'
-            }])
-            st.session_state.transactions = pd.concat([df, new_row], ignore_index=True)
+    
+    if 'transactions' not in st.session_state or st.session_state.transactions.empty:
+        st.session_state.auto_entries_cleaned = True
+        return
+    
+    desc_to_remove = ["Daily Gold Saving", "Axis Gold Fund (SIP)"]
+    # Filter out the auto entries
+    old_len = len(st.session_state.transactions)
+    st.session_state.transactions = st.session_state.transactions[
+        ~st.session_state.transactions['Description'].isin(desc_to_remove)
+    ]
+    new_len = len(st.session_state.transactions)
+    
+    if old_len != new_len:
+        # Update Google Sheet only if rows were removed
+        update_worksheet('Transactions', st.session_state.transactions)
+    
+    st.session_state.auto_entries_cleaned = True
 
 # ---------- AI CATEGORIZATION ----------
 def ai_categorize(desc):
@@ -352,6 +322,9 @@ def init_session_state():
         st.session_state.transactions = pd.DataFrame(columns=required_cols)
     else:
         st.session_state.transactions = loaded
+
+    # 🧹 CLEANUP: Delete previously auto-added SIP & Gold entries
+    cleanup_auto_entries()
 
     # 2. Budget
     loaded = all_data.get('Budget', pd.DataFrame())
@@ -513,8 +486,7 @@ with col_h2:
 
 st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
 
-# Run daily auto entries on each load
-add_daily_auto_entries()
+# ⛔ AUTO ENTRIES ARE NOW DISABLED AND CLEANED UP
 
 # Navigation
 nav = st.radio("Menu", ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"], index=0, horizontal=True, key='nav_radio')
@@ -571,14 +543,6 @@ if st.session_state.page == "🏠 Home":
     # BC stats
     bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
 
-    # Hand Loan stats
-    if not df_tx.empty:
-        handloan_income = df_tx[(df_tx['Type'] == 'Hand Loan') & (df_tx['Type'] == 'Income')]['Amount'].sum()
-        handloan_expense = df_tx[(df_tx['Type'] == 'Hand Loan') & (df_tx['Type'] == 'Expense')]['Amount'].sum()
-        handloan_outstanding = handloan_income - handloan_expense
-    else:
-        handloan_outstanding = 0
-
     # Row 1: Accounts
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -590,15 +554,13 @@ if st.session_state.page == "🏠 Home":
     with col4:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💵 Cash</div><div class='sheet-card-value'>{format_currency(cash_bal)}</div></div>", unsafe_allow_html=True)
 
-    # Row 2: Income, Expense, Hand Loan, Budget
-    col5, col6, col7, col8 = st.columns(4)
+    # Row 2: Income, Expense, Budget (Hand Loan Removed)
+    col5, col6, col7 = st.columns(3)
     with col5:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Income</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col6:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Total Expense</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(monthly_exp)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
     with col7:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🤝 Hand Loan</div><div class='sheet-card-value' style='color:#8b5cf6;'>{format_currency(handloan_outstanding)}</div><div class='sheet-card-sub'>Outstanding</div></div>", unsafe_allow_html=True)
-    with col8:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 This Month Budget</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
 
     # Row 3: Investment, EMI, BC
@@ -1178,7 +1140,6 @@ elif st.session_state.page == "🏦 Bank":
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
     
-    # 🛠️ Fix: all_cats aur all_types yahan define karna zaroori hai taaki Recurring tab use kar sake
     budget_cats = st.session_state.budget['Category'].tolist()
     inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
     emi_names = st.session_state.emi['Loan Name'].tolist() if not st.session_state.emi.empty else []
