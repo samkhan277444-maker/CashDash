@@ -12,6 +12,17 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 # ---------- PWA INJECTION ----------
 st.markdown("""
+<link rel="manifest" href="https://gist.githubusercontent.com/samkhan277444-maker/102996dff4fc81180ec44561deb2bb0b/raw/0ed6378bbacd92448586806fc0ea361d5c0e86f1/manifest.json">
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('https://gist.githubusercontent.com/samkhan277444-maker/102996dff4fc81180ec44561deb2bb0b/raw/0ed6378bbacd92448586806fc0ea361d5c0e86f1/gistfile1.txt
+
+');
+}
+</script>
+""", unsafe_allow_html=True)
+# ---------- PWA INJECTION ----------
+st.markdown("""
 <link rel="manifest" href="YOUR_MANIFEST_RAW_URL">
 <script>
 if ('serviceWorker' in navigator) {
