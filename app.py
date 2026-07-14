@@ -529,13 +529,17 @@ if st.session_state.page == "🏠 Home":
     with col11:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_total)}</div><div class='sheet-card-sub'>All time</div></div>", unsafe_allow_html=True)
 
-    # Row 4: Net Worth History (6 months trend)
+       # Row 4: Net Worth History (6 months trend)
     st.markdown("### 📈 Net Worth Trend")
     if not df_tx.empty:
         df_tx['Date'] = pd.to_datetime(df_tx['Date'])
         df_tx['Month'] = df_tx['Date'].dt.to_period('M')
         monthly_net = df_tx.groupby('Month').apply(lambda x: x[x['Type']=='Income']['Amount'].sum() - x[x['Type']=='Expense']['Amount'].sum()).reset_index()
         monthly_net.columns = ['Month', 'Net Worth']
+        
+        # 🛡️ FIX: Convert Period to string for Plotly JSON serialization
+        monthly_net['Month'] = monthly_net['Month'].astype(str)
+        
         # Add Investments and subtract EMI
         if not st.session_state.investments.empty:
             monthly_net['Net Worth'] += st.session_state.investments['Current Value'].sum()
@@ -546,7 +550,6 @@ if st.session_state.page == "🏠 Home":
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Add transactions to see Net Worth trend.")
-
     # Row 5: Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
