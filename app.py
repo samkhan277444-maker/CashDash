@@ -128,7 +128,7 @@ def load_all_sheets():
     
     data = {}
     worksheet_names = ['Transactions', 'Budget', 'Accounts', 'Investments', 'EmiManager', 
-                       'Goals', 'FuelTracker', 'Settings']
+                       'Goals', 'FuelTracker', 'Settings', 'CustomTypes', 'CustomCategories', 'CustomNatures', 'Recurring']
     
     try:
         sh = gc.open(SHEET_NAME)
@@ -424,6 +424,34 @@ def init_session_state():
         else:
             st.session_state.last_sync_time = "Never"
 
+    # 9. Custom Types
+    loaded = all_data.get('CustomTypes', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['TypeName','Nature']):
+        st.session_state.custom_types = pd.DataFrame(columns=['TypeName','Nature'])
+    else:
+        st.session_state.custom_types = loaded
+
+    # 10. Custom Categories
+    loaded = all_data.get('CustomCategories', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Category']):
+        st.session_state.custom_categories = pd.DataFrame(columns=['Category'])
+    else:
+        st.session_state.custom_categories = loaded
+
+    # 11. Custom Natures
+    loaded = all_data.get('CustomNatures', pd.DataFrame())
+    if loaded.empty or not all(c in loaded.columns for c in ['Nature']):
+        st.session_state.custom_natures = pd.DataFrame({'Nature': ['Income', 'Expense']})
+    else:
+        st.session_state.custom_natures = loaded
+
+    # 12. Recurring
+    loaded = all_data.get('Recurring', pd.DataFrame())
+    if loaded.empty:
+        st.session_state.recurring = pd.DataFrame(columns=['Description','Category','Amount','Type','Payment Mode','Frequency','NextDate'])
+    else:
+        st.session_state.recurring = loaded
+
 if 'initialized' not in st.session_state:
     init_session_state()
     st.session_state.initialized = True
@@ -459,6 +487,10 @@ def force_sync():
         update_worksheet('EmiManager', st.session_state.emi)
         update_worksheet('Goals', st.session_state.goals)
         update_worksheet('FuelTracker', st.session_state.fuel)
+        update_worksheet('CustomTypes', st.session_state.custom_types)
+        update_worksheet('CustomCategories', st.session_state.custom_categories)
+        update_worksheet('CustomNatures', st.session_state.custom_natures)
+        update_worksheet('Recurring', st.session_state.recurring)
         
         sync_time = datetime.now().strftime("%d %b %Y, %H:%M:%S")
         update_settings('last_sync_time', sync_time)
@@ -1164,7 +1196,7 @@ elif st.session_state.page == "🏦 Bank":
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
     
-    # 🛠️ FIX: Define all_cats and all_types here so Recurring tab can use them
+    # 🛠️ Fix: all_cats aur all_types yahan define karna zaroori hai taaki Recurring tab use kar sake
     budget_cats = st.session_state.budget['Category'].tolist()
     inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
     emi_names = st.session_state.emi['Loan Name'].tolist() if not st.session_state.emi.empty else []
