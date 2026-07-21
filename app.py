@@ -554,7 +554,7 @@ if st.session_state.page == "🏠 Home":
     with col4:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💵 Cash</div><div class='sheet-card-value'>{format_currency(cash_bal)}</div></div>", unsafe_allow_html=True)
 
-    # Row 2: Income, Expense, Budget (Hand Loan Removed)
+    # Row 2: Income, Expense, Budget
     col5, col6, col7 = st.columns(3)
     with col5:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Income</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
@@ -667,6 +667,11 @@ elif st.session_state.page == "➕ Add":
         nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
         if nature is None or nature == "Neutral":
             nature = "Income"   # fallback
+        
+        # 🛠️ FIX: Agar Type "BC" hai, toh nature ko forcefully "Expense" bana do taaki balance minus ho
+        if ttype == "BC":
+            nature = "Expense"
+            
         st.text(f"Nature: {nature} (auto-assigned)")
         
         category = None
