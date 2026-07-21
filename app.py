@@ -8,6 +8,8 @@ import re
 from datetime import datetime, timedelta
 import gspread
 from google.oauth2.service_account import Credentials
+import yfinance as yf
+import requests
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
@@ -30,7 +32,7 @@ THEMES = {
 }
 c = THEMES[st.session_state.theme]
 
-# ---------- DYNAMIC CSS (Monarch/CRED Glassmorphism) ----------
+# ---------- DYNAMIC CSS ----------
 css = f"""
 <style>
     .stApp {{
@@ -204,6 +206,84 @@ def update_settings(key, value):
     except Exception as e:
         st.warning(f"Could not update settings: {e}")
 
+# ---------- LIVE PRICE FUNCTIONS ----------
+@st.cache_data(ttl=3600)
+def get_gold_price_inr_per_gram():
+    try:
+        gold = yf.Ticker("GC=F")
+        data = gold.history(period="1d")
+        usd_per_ounce = data['Close'].iloc[-1]
+        usd_inr = yf.Ticker("USDINR=X")
+        rate_data = usd_inr.history(period="1d")
+        inr_per_usd = rate_data['Close'].iloc[-1]
+        price_per_gram = (usd_per_ounce * inr_per_usd) / 31.1035
+        return round(price_per_gram, 2)
+    except:
+        return None
+
+@st.cache_data(ttl=3600)
+def get_axis_gold_fund_nav():
+    try:
+        scheme_code = 120724
+        url = f"https://api.mfapi.in/mf/{scheme_code}"
+        resp = requests.get(url)
+        if resp.status_code == 200:
+            data = resp.json()
+            nav = float(data['data'][0]['nav'])
+            return nav
+        else:
+            return None
+    except:
+        return None
+
+# ---------- BC TYPE DETECTION ----------
+def is_bc_type(ttype):
+    """Return True if type name indicates Bachat Gat (saving pool)."""
+    if not ttype:
+        return False
+    return 'bc' in ttype.lower() or 'bachat' in ttype.lower()
+
+# ---------- AI NATURE DETECTION ----------
+def ai_detect_nature(desc, category, amount, ttype):
+    """
+    Automatically detect nature (Income/Expense/Neutral) using rule-based AI.
+    """
+    desc_lower = desc.lower() if desc else ''
+    cat_lower = category.lower() if category else ''
+    ttype_lower = ttype.lower() if ttype else ''
+    
+    # Income keywords
+    income_keywords = ['salary', 'income', 'credit', 'refund', 'cashback', 'bonus', 'interest', 'dividend', 'gift', 'received']
+    # Expense keywords
+    expense_keywords = ['emi', 'bill', 'payment', 'fee', 'tax', 'purchase', 'buy', 'rent', 'groceries', 'fuel', 
+                        'medicine', 'insurance', 'recharge', 'repair', 'maintenance', 'subscription', 'fine', 'penalty']
+    
+    # Check description first
+    for kw in income_keywords:
+        if kw in desc_lower:
+            return 'Income'
+    for kw in expense_keywords:
+        if kw in desc_lower:
+            return 'Expense'
+    
+    # Check category
+    if cat_lower in ['transfer', 'hand loan']:
+        return 'Neutral'
+    if cat_lower in ['salary', 'income', 'bonus', 'dividend']:
+        return 'Income'
+    if cat_lower in ['emi', 'rent', 'fuel', 'groceries', 'utilities', 'entertainment', 'shopping', 'education', 'investment',
+                     'insurance', 'medical', 'repair', 'subscription']:
+        return 'Expense'
+    
+    # Check type
+    if ttype_lower in ['income']:
+        return 'Income'
+    if ttype_lower in ['expense', 'investment']:
+        return 'Expense'
+    
+    # Fallback: use amount sign? But amount is always positive.
+    return None  # will be handled by default map
+
 # ---------- AI SUBSCRIPTION DETECTIVE ----------
 def detect_subscription_anomalies():
     df = st.session_state.transactions
@@ -229,7 +309,7 @@ def detect_subscription_anomalies():
                     alerts.append(f"⚠️ AI Detective: {desc} charges changed from ₹{prices[0]:.0f} to ₹{prices[-1]:.0f}.")
     return alerts
 
-# ---------- CLEANUP AUTO ENTRIES (Gold + SIP Axis) ----------
+# ---------- CLEANUP AUTO ENTRIES ----------
 def cleanup_auto_entries():
     """Delete all previously auto-added 'Daily Gold Saving' and 'Axis Gold Fund (SIP)' entries."""
     if 'auto_entries_cleaned' in st.session_state:
@@ -240,7 +320,6 @@ def cleanup_auto_entries():
         return
     
     desc_to_remove = ["Daily Gold Saving", "Axis Gold Fund (SIP)"]
-    # Filter out the auto entries
     old_len = len(st.session_state.transactions)
     st.session_state.transactions = st.session_state.transactions[
         ~st.session_state.transactions['Description'].isin(desc_to_remove)
@@ -248,7 +327,6 @@ def cleanup_auto_entries():
     new_len = len(st.session_state.transactions)
     
     if old_len != new_len:
-        # Update Google Sheet only if rows were removed
         update_worksheet('Transactions', st.session_state.transactions)
     
     st.session_state.auto_entries_cleaned = True
@@ -268,7 +346,7 @@ def ai_categorize(desc):
             return category
     return 'Others'
 
-# ---------- AI ASSISTANT (Rule-based Chatbot) ----------
+# ---------- AI ASSISTANT ----------
 def ai_assistant_response(query):
     df = st.session_state.transactions
     if df.empty:
@@ -323,7 +401,6 @@ def init_session_state():
     else:
         st.session_state.transactions = loaded
 
-    # 🧹 CLEANUP: Delete previously auto-added SIP & Gold entries
     cleanup_auto_entries()
 
     # 2. Budget
@@ -348,14 +425,16 @@ def init_session_state():
     else:
         st.session_state.accounts = loaded
 
-    # 4. Investments
+    # 4. Investments - ensure 'Units' column exists
     loaded = all_data.get('Investments', pd.DataFrame())
     if not loaded.empty and 'Name' in loaded.columns:
         loaded = loaded[loaded['Name'].notna() & (loaded['Name'].astype(str).str.strip() != '')]
     req_inv_cols = ['Name','Type','Amount','Frequency','Total Invested','Current Value']
     if loaded.empty or not all(c in loaded.columns for c in req_inv_cols):
-        st.session_state.investments = pd.DataFrame(columns=req_inv_cols)
+        st.session_state.investments = pd.DataFrame(columns=req_inv_cols + ['Units'])
     else:
+        if 'Units' not in loaded.columns:
+            loaded['Units'] = 0.0
         st.session_state.investments = loaded
 
     # 5. EMI
@@ -486,8 +565,6 @@ with col_h2:
 
 st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
 
-# ⛔ AUTO ENTRIES ARE NOW DISABLED AND CLEANED UP
-
 # Navigation
 nav = st.radio("Menu", ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"], index=0, horizontal=True, key='nav_radio')
 st.session_state.page = nav
@@ -496,7 +573,6 @@ st.session_state.page = nav
 if st.session_state.page == "🏠 Home":
     st.markdown("## 📊 Dashboard")
     
-    # Show AI Alerts
     alerts = detect_subscription_anomalies()
     for alert in alerts:
         st.warning(alert)
@@ -504,7 +580,6 @@ if st.session_state.page == "🏠 Home":
     current_month = datetime.now().strftime('%B')
     df_tx = st.session_state.transactions
     
-    # Bank balances
     bob_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='BOB Bank', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     bom_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='BOM Bank', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
     upi_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='PhonePe Wallet', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
@@ -521,7 +596,6 @@ if st.session_state.page == "🏠 Home":
     savings = monthly_inc - monthly_exp
     total_budget_val = st.session_state.budget['Current Month Budget'].sum()
     
-    # Investment stats
     inv_df = st.session_state.investments
     if not inv_df.empty and 'Name' in inv_df.columns:
         sip_mask = inv_df['Name'].str.upper() == 'SIP'
@@ -536,12 +610,17 @@ if st.session_state.page == "🏠 Home":
     total_invested = sip_inv + gold_inv
     current_value = sip_curr + gold_curr
     
-    # EMI stats
     total_emi_remaining = st.session_state.emi['Remaining'].sum() if not st.session_state.emi.empty else 0
     total_emi_due = st.session_state.emi['EMI Amount'].sum() if not st.session_state.emi.empty else 0
     
-    # BC stats
-    bc_total = df_tx[df_tx['Type']=='BC']['Amount'].sum() if not df_tx.empty else 0
+    # BC Total - robust detection
+    bc_total = 0.0
+    if not df_tx.empty:
+        type_series = df_tx['Type'].astype(str).str.strip().str.lower()
+        mask = type_series.str.contains('bc|bachat', na=False)
+        bc_total = df_tx.loc[mask, 'Amount'].sum()
+        if pd.isna(bc_total):
+            bc_total = 0.0
 
     # Row 1: Accounts
     col1, col2, col3, col4 = st.columns(4)
@@ -579,7 +658,7 @@ if st.session_state.page == "🏠 Home":
     with col11:
         st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_total)}</div><div class='sheet-card-sub'>All time</div></div>", unsafe_allow_html=True)
 
-    # Row 4: AI Insights Card
+    # Row 4: AI Insights
     st.markdown("### 🤖 AI Insights")
     col_ai1, col_ai2 = st.columns(2)
     with col_ai1:
@@ -608,7 +687,7 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No transactions yet.")
 
-    # Row 6: MANUAL SYNC BUTTON
+    # Row 6: Manual Sync
     st.markdown("---")
     col_sync1, col_sync2 = st.columns([3, 1])
     with col_sync1:
@@ -668,11 +747,15 @@ elif st.session_state.page == "➕ Add":
         if nature is None or nature == "Neutral":
             nature = "Income"   # fallback
         
-        # 🛠️ FIX: Agar Type "BC" hai, toh nature ko forcefully "Expense" bana do taaki balance minus ho
-        if ttype == "BC":
+        # 🧠 AI Nature Detection
+        ai_nature = ai_detect_nature(desc, "", amount, ttype) if desc else None
+        if ai_nature and not is_bc_type(ttype):
+            nature = ai_nature
+        # BC is always Expense
+        if is_bc_type(ttype):
             nature = "Expense"
             
-        st.text(f"Nature: {nature} (auto-assigned)")
+        st.text(f"Nature: {nature} (auto-assigned by AI)")
         
         category = None
         if ttype != "Income" and nature != "Income":
@@ -705,9 +788,10 @@ elif st.session_state.page == "➕ Add":
         else:
             st.info("No EMI loans added yet. Go to More > EMI to add a loan.")
     
-    # Investment fields
+    # Investment fields (with Units auto-calculation for Gold and Axis Gold Fund)
     is_investment = (ttype == "Investment") or (category and category in inv_names)
     inv_name = None
+    inv_units = 0.0
     if is_investment:
         existing_inv = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
         if category and category in existing_inv:
@@ -717,10 +801,21 @@ elif st.session_state.page == "➕ Add":
             inv_name = st.selectbox("Select Investment", inv_options)
             if inv_name == 'New Investment':
                 inv_name = st.text_input("Enter new investment name")
-        if inv_name in existing_inv:
+        if inv_name and inv_name in existing_inv:
             inv_row = st.session_state.investments[st.session_state.investments['Name'] == inv_name]
             if not inv_row.empty:
                 st.info(f"Current Total Invested: {format_currency(inv_row.iloc[0]['Total Invested'])}")
+                # For Gold or Axis Gold Fund, show units and price
+                if 'Gold' in inv_name or 'Axis Gold Fund' in inv_name:
+                    inv_units = inv_row.iloc[0].get('Units', 0.0)
+                    if 'Gold' in inv_name:
+                        price = get_gold_price_inr_per_gram()
+                        if price:
+                            st.info(f"💡 Current Gold price: ₹{price}/gram. Your units: {inv_units:.4f}g → Value: {format_currency(inv_units*price)}")
+                    elif 'Axis Gold Fund' in inv_name:
+                        nav = get_axis_gold_fund_nav()
+                        if nav:
+                            st.info(f"💡 Current NAV: ₹{nav:.4f}. Your units: {inv_units:.4f} → Value: {format_currency(inv_units*nav)}")
     
     # Fuel fields
     is_fuel = (ttype == "Expense") and (category == 'Fuel' or (category and 'fuel' in category.lower()))
@@ -755,14 +850,15 @@ elif st.session_state.page == "➕ Add":
                 st.session_state.accounts.loc[to_idx, 'Balance'] += amount
                 update_worksheet('Accounts', st.session_state.accounts)
             
-            # 2. Payment Mode Balance (non-transfer)
+            # 2. Payment Mode Balance (non-transfer) using AI nature
             else:
                 acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                 if not acc_idx.empty:
                     idx = acc_idx[0]
+                    # Use the nature we already computed (AI or forced)
                     if nature == "Income":
                         st.session_state.accounts.loc[idx, 'Balance'] += amount
-                    elif nature in ["Expense", "BC"]:
+                    elif nature in ["Expense", "BC"] or is_bc_type(ttype):
                         st.session_state.accounts.loc[idx, 'Balance'] -= amount
                     update_worksheet('Accounts', st.session_state.accounts)
 
@@ -773,13 +869,25 @@ elif st.session_state.page == "➕ Add":
                 st.session_state.emi.loc[emi_idx, 'Remaining'] = max(0, current_remaining - amount)
                 update_worksheet('EmiManager', st.session_state.emi)
             
-            # 4. Investment
+            # 4. Investment (with Units auto-update for Gold / Axis Gold Fund)
             if is_investment and inv_name and amount > 0:
+                price_per_unit = None
+                if 'Gold' in inv_name:
+                    price_per_unit = get_gold_price_inr_per_gram()
+                elif 'Axis Gold Fund' in inv_name:
+                    price_per_unit = get_axis_gold_fund_nav()
+                # If we have a price, calculate units = amount / price
+                units_added = 0.0
+                if price_per_unit and price_per_unit > 0:
+                    units_added = amount / price_per_unit
+                # Update or add investment
                 if inv_name in st.session_state.investments['Name'].values:
-                    idx = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
-                    st.session_state.investments.loc[idx, 'Total Invested'] += amount
+                    idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
+                    st.session_state.investments.loc[idx_inv, 'Total Invested'] += amount
                     if 'Current Value' in st.session_state.investments.columns:
-                        st.session_state.investments.loc[idx, 'Current Value'] += amount
+                        st.session_state.investments.loc[idx_inv, 'Current Value'] += amount
+                    if units_added > 0:
+                        st.session_state.investments.loc[idx_inv, 'Units'] = st.session_state.investments.loc[idx_inv, 'Units'] + units_added
                 else:
                     new_inv = pd.DataFrame({
                         'Name': [inv_name],
@@ -787,7 +895,8 @@ elif st.session_state.page == "➕ Add":
                         'Amount': [0],
                         'Frequency': ['Monthly'],
                         'Total Invested': [amount],
-                        'Current Value': [amount]
+                        'Current Value': [amount],
+                        'Units': [units_added]
                     })
                     st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
                 update_worksheet('Investments', st.session_state.investments)
@@ -891,26 +1000,31 @@ elif st.session_state.page == "➕ Add":
                         st.session_state.fuel = st.session_state.fuel.drop(fuel_idx[0]).reset_index(drop=True)
                         update_worksheet('FuelTracker', st.session_state.fuel)
                 
-                # Reverse Account Balance
+                # Reverse Account Balance (using AI nature)
                 if ttype != "Transfer":
                     acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                     if not acc_idx.empty:
-                        idx = acc_idx[0]
-                        default_nature_map = {
-                            "Income": "Income",
-                            "Expense": "Expense",
-                            "Investment": "Expense",
-                            "Transfer": "Neutral",
-                            "BC": "Expense"
-                        }
-                        custom_nature = None
-                        if ttype in st.session_state.custom_types['TypeName'].values:
-                            custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
-                        nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
-                        if nature == "Income":
-                            st.session_state.accounts.loc[idx, 'Balance'] -= amount
-                        elif nature in ["Expense", "BC"]:
-                            st.session_state.accounts.loc[idx, 'Balance'] += amount
+                        idx_acc = acc_idx[0]
+                        # Determine nature for reversal using same AI logic
+                        rev_nature = ai_detect_nature(tx.get('Description',''), category, amount, ttype)
+                        if not rev_nature:
+                            default_nature_map = {
+                                "Income": "Income",
+                                "Expense": "Expense",
+                                "Investment": "Expense",
+                                "Transfer": "Neutral",
+                                "BC": "Expense"
+                            }
+                            custom_nature = None
+                            if ttype in st.session_state.custom_types['TypeName'].values:
+                                custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+                            rev_nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                        if is_bc_type(ttype):
+                            rev_nature = "Expense"
+                        if rev_nature == "Income":
+                            st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount
+                        elif rev_nature in ["Expense", "BC"]:
+                            st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
                         update_worksheet('Accounts', st.session_state.accounts)
                 
                 st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
@@ -1141,7 +1255,7 @@ elif st.session_state.page == "🏦 Bank":
             st.session_state.page = "🏠 Home"
             st.rerun()
 
-# ===================== MORE (Premium Modules + AI Assistant) =====================
+# ===================== MORE (Premium Modules) =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
     
@@ -1162,16 +1276,68 @@ elif st.session_state.page == "⚡ More":
     
     # ---------- Investments ----------
     with tabs[0]:
+        st.markdown("#### 💼 Your Investments")
+        # Show current values with auto-update button
+        if st.button("🔄 Update Current Values (Gold & Axis Gold Fund)"):
+            updated = False
+            for idx, row in st.session_state.investments.iterrows():
+                name = row['Name']
+                if 'Gold' in name:
+                    price = get_gold_price_inr_per_gram()
+                    if price and row['Units'] > 0:
+                        st.session_state.investments.loc[idx, 'Current Value'] = row['Units'] * price
+                        updated = True
+                elif 'Axis Gold Fund' in name:
+                    nav = get_axis_gold_fund_nav()
+                    if nav and row['Units'] > 0:
+                        st.session_state.investments.loc[idx, 'Current Value'] = row['Units'] * nav
+                        updated = True
+            if updated:
+                update_worksheet('Investments', st.session_state.investments)
+                st.cache_data.clear()
+                st.success("✅ Current values updated from live prices!")
+                st.rerun()
+            else:
+                st.info("No Gold/Axis Gold Fund investments with units found. Please add some transactions first.")
+        
         st.dataframe(st.session_state.investments, hide_index=True, use_container_width=True)
-        with st.expander("➕ Add / Edit Investment"):
+        
+        with st.expander("✏️ Edit Investment (Manually adjust Units)"):
+            if not st.session_state.investments.empty:
+                inv_edit = st.selectbox("Select Investment to Edit", st.session_state.investments['Name'])
+                inv_row = st.session_state.investments[st.session_state.investments['Name'] == inv_edit]
+                if not inv_row.empty:
+                    new_units = st.number_input("Units", value=float(inv_row.iloc[0]['Units']), step=0.001, format="%.4f")
+                    if st.button("Update Units"):
+                        idx = inv_row.index[0]
+                        st.session_state.investments.loc[idx, 'Units'] = new_units
+                        # Recalculate Current Value if Gold or Axis Gold Fund
+                        name = inv_row.iloc[0]['Name']
+                        if 'Gold' in name:
+                            price = get_gold_price_inr_per_gram()
+                            if price:
+                                st.session_state.investments.loc[idx, 'Current Value'] = new_units * price
+                        elif 'Axis Gold Fund' in name:
+                            nav = get_axis_gold_fund_nav()
+                            if nav:
+                                st.session_state.investments.loc[idx, 'Current Value'] = new_units * nav
+                        update_worksheet('Investments', st.session_state.investments)
+                        st.cache_data.clear()
+                        st.success("Units updated!")
+                        st.rerun()
+            else:
+                st.info("No investments to edit.")
+        
+        with st.expander("➕ Add / Edit Investment (Full details)"):
             inv_name = st.text_input("Investment Name")
             inv_type = st.selectbox("Type", ["SIP", "Gold", "MF", "Stock", "Other"])
             freq = st.selectbox("Frequency", ["Monthly", "Weekly"])
             amt = st.number_input("Amount ₹", min_value=0.0)
             invested = st.number_input("Total Invested So Far ₹", min_value=0.0)
             curr = st.number_input("Current Value ₹", min_value=0.0)
+            units = st.number_input("Units (for Gold/Funds)", min_value=0.0, step=0.001, format="%.4f")
             if st.button("Save Investment"):
-                new_inv = pd.DataFrame({'Name':[inv_name], 'Type':[inv_type], 'Amount':[amt], 'Frequency':[freq], 'Total Invested':[invested], 'Current Value':[curr]})
+                new_inv = pd.DataFrame({'Name':[inv_name], 'Type':[inv_type], 'Amount':[amt], 'Frequency':[freq], 'Total Invested':[invested], 'Current Value':[curr], 'Units':[units]})
                 st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
                 update_worksheet('Investments', st.session_state.investments)
                 st.cache_data.clear()
@@ -1247,7 +1413,6 @@ elif st.session_state.page == "⚡ More":
             df['Date'] = pd.to_datetime(df['Date'])
             df['Month'] = df['Date'].dt.month_name()
             
-            # 1. Income vs Expense
             inc = df[df['Type']=='Income'].groupby('Month')['Amount'].sum().reset_index()
             exp = df[df['Type']=='Expense'].groupby('Month')['Amount'].sum().reset_index()
             merged = pd.merge(inc, exp, on='Month', how='outer').fillna(0)
@@ -1256,14 +1421,12 @@ elif st.session_state.page == "⚡ More":
             fig1.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
             st.plotly_chart(fig1, use_container_width=True)
             
-            # 2. Expense Breakdown
             df_exp = df[df['Type']=='Expense'].groupby('Category')['Amount'].sum().reset_index()
             if not df_exp.empty:
                 fig2 = px.pie(df_exp, names='Category', values='Amount', title="🧾 Expense Breakdown", hole=0.3)
                 fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig2, use_container_width=True)
             
-            # 3. Fuel
             fuel_df = st.session_state.fuel
             if not fuel_df.empty:
                 fuel_df['Date'] = pd.to_datetime(fuel_df['Date'])
@@ -1273,7 +1436,6 @@ elif st.session_state.page == "⚡ More":
                 fig3.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig3, use_container_width=True)
             
-            # 4. EMI
             emi_tx = df[(df['Category']=='EMI') & (df['Type']=='Expense')]
             if not emi_tx.empty:
                 emi_monthly = emi_tx.groupby('Month')['Amount'].sum().reset_index()
@@ -1281,7 +1443,6 @@ elif st.session_state.page == "⚡ More":
                 fig4.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
                 st.plotly_chart(fig4, use_container_width=True)
             
-            # 5. Investment
             inv_df = st.session_state.investments
             if not inv_df.empty:
                 total_inv = inv_df[inv_df['Name'].str.upper().isin(['SIP','GOLD'])]['Total Invested'].sum()
@@ -1295,8 +1456,10 @@ elif st.session_state.page == "⚡ More":
                     fig5.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
                     st.plotly_chart(fig5, use_container_width=True)
             
-            # 6. BC
-            bc_tx = df[df['Type']=='BC']
+            # BC using robust detection
+            type_series = df['Type'].astype(str).str.strip().str.lower()
+            bc_mask = type_series.str.contains('bc|bachat', na=False)
+            bc_tx = df[bc_mask]
             if not bc_tx.empty:
                 bc_monthly = bc_tx.groupby('Month')['Amount'].sum().reset_index()
                 fig6 = px.bar(bc_monthly, x='Month', y='Amount', title="💳 BC (Bachat Gat) Per Month", color_discrete_sequence=['#3b82f6'])
@@ -1368,7 +1531,6 @@ elif st.session_state.page == "⚡ More":
                     st.success(f"Category '{cat_to_del}' deleted!")
                     st.rerun()
         
-        # Custom Natures
         st.markdown("#### 🌿 Custom Natures")
         st.info("Add new natures like 'Neutral', 'Credit', 'Debit'. (Default 'Income' and 'Expense' are protected and cannot be deleted.)")
         if not st.session_state.custom_natures.empty:
@@ -1426,7 +1588,6 @@ elif st.session_state.page == "⚡ More":
                         amount = tx['Amount']
                         payment_mode = tx['Payment Mode']
                         
-                        # Reverse budget, EMI, Investment, Fuel, Account Balance (same logic)
                         if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
                             cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                             st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
@@ -1465,22 +1626,26 @@ elif st.session_state.page == "⚡ More":
                         if ttype != "Transfer":
                             acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                             if not acc_idx.empty:
-                                idx = acc_idx[0]
-                                default_nature_map = {
-                                    "Income": "Income",
-                                    "Expense": "Expense",
-                                    "Investment": "Expense",
-                                    "Transfer": "Neutral",
-                                    "BC": "Expense"
-                                }
-                                custom_nature = None
-                                if ttype in st.session_state.custom_types['TypeName'].values:
-                                    custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
-                                nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
-                                if nature == "Income":
-                                    st.session_state.accounts.loc[idx, 'Balance'] -= amount
-                                elif nature in ["Expense", "BC"]:
-                                    st.session_state.accounts.loc[idx, 'Balance'] += amount
+                                idx_acc = acc_idx[0]
+                                rev_nature = ai_detect_nature(tx.get('Description',''), category, amount, ttype)
+                                if not rev_nature:
+                                    default_nature_map = {
+                                        "Income": "Income",
+                                        "Expense": "Expense",
+                                        "Investment": "Expense",
+                                        "Transfer": "Neutral",
+                                        "BC": "Expense"
+                                    }
+                                    custom_nature = None
+                                    if ttype in st.session_state.custom_types['TypeName'].values:
+                                        custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+                                    rev_nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                                if is_bc_type(ttype):
+                                    rev_nature = "Expense"
+                                if rev_nature == "Income":
+                                    st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount
+                                elif rev_nature in ["Expense", "BC"]:
+                                    st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
                                 update_worksheet('Accounts', st.session_state.accounts)
                         
                         st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
@@ -1500,7 +1665,7 @@ elif st.session_state.page == "⚡ More":
         else:
             st.info("No transactions yet.")
     
-    # ---------- Recurring Transactions ----------
+    # ---------- Recurring ----------
     with tabs[6]:
         st.markdown("### 🔄 Recurring Transactions")
         st.info("Add transactions that repeat daily, weekly, or monthly. They will be auto-added on their due date.")
