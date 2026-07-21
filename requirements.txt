@@ -4,7 +4,5 @@ numpy
 plotly
 gspread
 google-auth
-pdfplumber
-schedule
-streamlit-mic-recorder
+yfinance
 requests
