@@ -14,49 +14,37 @@ import requests
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash of Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- THEME TOGGLE ----------
-if 'theme' not in st.session_state:
-    st.session_state.theme = 'dark'
+# ---------- LIGHT THEME (NO DARK MODE) ----------
+# Unique background gradient: Sky Blue to Lavender
+BG_GRADIENT = "linear-gradient(135deg, #e0e7ff 0%, #f0e6ff 50%, #fce4ec 100%)"
 
-THEMES = {
-    'dark': {
-        'bg': '#0f111a', 'text': '#f0f2f6', 'card': 'rgba(30, 35, 45, 0.6)',
-        'border': 'rgba(255,255,255,0.08)', 'sub': '#94a3b8', 'primary': '#00d4ff',
-        'hover': '#00b0d4', 'btn_text': '#0f111a', 'shadow': '0 8px 32px rgba(0,0,0,0.5)'
-    },
-    'light': {
-        'bg': '#f5f7fa', 'text': '#1e293b', 'card': 'rgba(255, 255, 255, 0.75)',
-        'border': '#e2e8f0', 'sub': '#64748b', 'primary': '#1a73e8',
-        'hover': '#1557b0', 'btn_text': '#ffffff', 'shadow': '0 4px 12px rgba(0,0,0,0.05)'
-    }
-}
-c = THEMES[st.session_state.theme]
-
-# ---------- DYNAMIC CSS ----------
-css = f"""
+CSS = f"""
 <style>
+    /* Main background */
     .stApp {{
-        background-color: {c['bg']};
-        color: {c['text']};
+        background: {BG_GRADIENT};
+        min-height: 100vh;
     }}
+    
+    /* Glassmorphism cards */
     .sheet-card {{
-        background: {c['card']};
+        background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border-radius: 20px;
         padding: 16px 20px;
         margin-bottom: 16px;
-        border: 1px solid {c['border']};
-        box-shadow: {c['shadow']};
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
         text-align: center;
         transition: all 0.3s ease;
     }}
     .sheet-card:hover {{
         transform: translateY(-4px);
-        box-shadow: 0 12px 40px rgba(0,0,0,{0.7 if st.session_state.theme=='dark' else 0.1});
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
     }}
     .sheet-card-header {{
-        color: {c['sub']};
+        color: #64748b;
         font-size: 0.7rem;
         font-weight: 600;
         text-transform: uppercase;
@@ -65,31 +53,34 @@ css = f"""
     .sheet-card-value {{
         font-size: 1.6rem;
         font-weight: 700;
-        color: {c['primary']};
     }}
     .sheet-card-sub {{
         font-size: 0.55rem;
-        color: {c['sub']};
+        color: #94a3b8;
         margin-top: 4px;
     }}
+    
+    /* Buttons */
     .stButton button {{
         width: 100%;
         border-radius: 12px;
         font-weight: 600;
         border: none;
-        background: {c['primary']};
-        color: {c['btn_text']};
+        background: #6366f1;
+        color: white;
         padding: 12px 0;
         transition: 0.3s;
     }}
     .stButton button:hover {{
-        background: {c['hover']};
+        background: #4f46e5;
         transform: scale(1.02);
     }}
-    .stDataFrame {{ font-size: 0.8rem; }}
+    
+    /* Hide elements */
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
     
+    /* Mobile responsive */
     @media (max-width: 768px) {{
         .sheet-card {{ padding: 10px 12px; min-width: 60px; }}
         .sheet-card-value {{ font-size: 1.2rem; }}
@@ -101,7 +92,16 @@ css = f"""
     }}
 </style>
 """
-st.markdown(css, unsafe_allow_html=True)
+st.markdown(CSS, unsafe_allow_html=True)
+
+# ---------- HEADER ----------
+st.markdown("""
+<div style='text-align: center; padding: 20px 0 10px 0;'>
+    <h1 style='color: #1e293b; margin: 0; font-size: 2rem;'>💎 CashDash</h1>
+    <p style='color: #64748b; margin: 0; font-size: 0.9rem;'>of Riyaz Pathan</p>
+    <p style='color: #94a3b8; font-size: 0.8rem;'>🕌 Assalamu Alaikum! | 📅 {}</p>
+</div>
+""".format(datetime.now().strftime('%d %b %Y')), unsafe_allow_html=True)
 
 # ---------- GOOGLE SHEET CONNECTION ----------
 SHEET_NAME = "CashDash" 
@@ -236,54 +236,6 @@ def get_axis_gold_fund_nav():
     except:
         return None
 
-# ---------- BC TYPE DETECTION ----------
-def is_bc_type(ttype):
-    """Return True if type name indicates Bachat Gat (saving pool)."""
-    if not ttype:
-        return False
-    return 'bc' in ttype.lower() or 'bachat' in ttype.lower()
-
-# ---------- AI NATURE DETECTION ----------
-def ai_detect_nature(desc, category, amount, ttype):
-    """
-    Automatically detect nature (Income/Expense/Neutral) using rule-based AI.
-    """
-    desc_lower = desc.lower() if desc else ''
-    cat_lower = category.lower() if category else ''
-    ttype_lower = ttype.lower() if ttype else ''
-    
-    # Income keywords
-    income_keywords = ['salary', 'income', 'credit', 'refund', 'cashback', 'bonus', 'interest', 'dividend', 'gift', 'received']
-    # Expense keywords
-    expense_keywords = ['emi', 'bill', 'payment', 'fee', 'tax', 'purchase', 'buy', 'rent', 'groceries', 'fuel', 
-                        'medicine', 'insurance', 'recharge', 'repair', 'maintenance', 'subscription', 'fine', 'penalty']
-    
-    # Check description first
-    for kw in income_keywords:
-        if kw in desc_lower:
-            return 'Income'
-    for kw in expense_keywords:
-        if kw in desc_lower:
-            return 'Expense'
-    
-    # Check category
-    if cat_lower in ['transfer', 'hand loan']:
-        return 'Neutral'
-    if cat_lower in ['salary', 'income', 'bonus', 'dividend']:
-        return 'Income'
-    if cat_lower in ['emi', 'rent', 'fuel', 'groceries', 'utilities', 'entertainment', 'shopping', 'education', 'investment',
-                     'insurance', 'medical', 'repair', 'subscription']:
-        return 'Expense'
-    
-    # Check type
-    if ttype_lower in ['income']:
-        return 'Income'
-    if ttype_lower in ['expense', 'investment']:
-        return 'Expense'
-    
-    # Fallback
-    return None
-
 # ---------- AI SUBSCRIPTION DETECTIVE ----------
 def detect_subscription_anomalies():
     df = st.session_state.transactions
@@ -330,64 +282,6 @@ def cleanup_auto_entries():
     
     st.session_state.auto_entries_cleaned = True
 
-# ---------- AI CATEGORIZATION ----------
-def ai_categorize(desc):
-    desc_lower = desc.lower()
-    keywords = {
-        'zomato': 'Food', 'swiggy': 'Food', 'uber': 'Transport', 'ola': 'Transport',
-        'amazon': 'Shopping', 'flipkart': 'Shopping', 'netflix': 'Entertainment',
-        'spotify': 'Entertainment', 'rent': 'Rent', 'salary': 'Salary', 'emi': 'EMI',
-        'fuel': 'Fuel', 'groceries': 'Groceries', 'vegetables': 'Vegetables',
-        'mobile': 'Mobile Recharge', 'electricity': 'Utilities', 'water': 'Utilities'
-    }
-    for keyword, category in keywords.items():
-        if keyword in desc_lower:
-            return category
-    return 'Others'
-
-# ---------- AI ASSISTANT ----------
-def ai_assistant_response(query):
-    df = st.session_state.transactions
-    if df.empty:
-        return "No transaction data available yet. Please add some transactions first."
-    current_month = datetime.now().strftime('%B')
-    df['Date'] = pd.to_datetime(df['Date'])
-    df_month = df[df['Date'].dt.month_name() == current_month]
-    
-    query = query.lower()
-    if "spend" in query and "groceries" in query:
-        amt = df_month[df_month['Category'] == 'Groceries']['Amount'].sum()
-        return f"💰 You've spent ₹{amt:.0f} on groceries this month."
-    elif "salary" in query:
-        amt = df_month[df_month['Category'] == 'Salary']['Amount'].sum()
-        return f"📈 Your total salary this month: ₹{amt:.0f}"
-    elif "total expense" in query or "expense" in query:
-        amt = df_month[df_month['Type'] == 'Expense']['Amount'].sum()
-        return f"📉 Your total expenses this month: ₹{amt:.0f}"
-    elif "total income" in query or "income" in query:
-        amt = df_month[df_month['Type'] == 'Income']['Amount'].sum()
-        return f"📈 Your total income this month: ₹{amt:.0f}"
-    elif "savings" in query:
-        inc = df_month[df_month['Type'] == 'Income']['Amount'].sum()
-        exp = df_month[df_month['Type'] == 'Expense']['Amount'].sum()
-        savings = inc - exp
-        return f"💎 Your savings this month: ₹{savings:.0f}"
-    elif "emi" in query:
-        emi_df = st.session_state.emi
-        if emi_df.empty:
-            return "No EMI loans found."
-        total_emi = emi_df['EMI Amount'].sum()
-        return f"🏦 Your total monthly EMI: ₹{total_emi:.0f}"
-    elif "investment" in query or "invest" in query:
-        inv_df = st.session_state.investments
-        if inv_df.empty:
-            return "No investments found."
-        total_inv = inv_df['Total Invested'].sum()
-        curr_val = inv_df['Current Value'].sum()
-        return f"📈 Total invested: ₹{total_inv:.0f}, Current value: ₹{curr_val:.0f}"
-    else:
-        return "I can help with: spending, income, savings, EMI, investments, or categories like groceries, salary, etc. Try asking me something specific!"
-
 # ---------- SESSION STATE ----------
 def init_session_state():
     all_data = load_all_sheets()
@@ -414,7 +308,7 @@ def init_session_state():
     else:
         st.session_state.budget = loaded
 
-    # 3. Accounts - ENSURE BC ACCOUNT EXISTS
+    # 3. Accounts - Ensure BC account exists
     loaded = all_data.get('Accounts', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Account','Balance']):
         st.session_state.accounts = pd.DataFrame({
@@ -427,7 +321,7 @@ def init_session_state():
             loaded = pd.concat([loaded, new_row], ignore_index=True)
         st.session_state.accounts = loaded
 
-    # 4. Investments
+    # 4. Investments - ensure Units column exists
     loaded = all_data.get('Investments', pd.DataFrame())
     if not loaded.empty and 'Name' in loaded.columns:
         loaded = loaded[loaded['Name'].notna() & (loaded['Name'].astype(str).str.strip() != '')]
@@ -522,15 +416,6 @@ def format_currency(amount):
 def total_balance():
     return st.session_state.accounts['Balance'].sum()
 
-def get_monthly_summary():
-    df = st.session_state.transactions
-    if df.empty: return pd.DataFrame(), pd.DataFrame()
-    df['Date'] = pd.to_datetime(df['Date'])
-    df['Month'] = df['Date'].dt.month_name()
-    inc = df[df['Type']=='Income'].groupby('Month')['Amount'].sum().reset_index()
-    exp = df[df['Type']=='Expense'].groupby('Month')['Amount'].sum().reset_index()
-    return inc, exp
-
 # ---------- SYNC FUNCTION ----------
 def force_sync():
     try:
@@ -555,19 +440,7 @@ def force_sync():
     except Exception as e:
         return False, f"❌ Sync failed: {e}"
 
-# ---------- APP UI ----------
-# Header with Theme Toggle
-col_h1, col_h2 = st.columns([0.85, 0.15])
-with col_h1:
-    st.markdown("<h2 style='color:#1e293b; margin-bottom:0;'>💎 CashDash of Riyaz Pathan</h2>", unsafe_allow_html=True)
-with col_h2:
-    if st.button("🌓 Toggle Theme", key="theme_toggle"):
-        st.session_state.theme = 'light' if st.session_state.theme == 'dark' else 'dark'
-        st.rerun()
-
-st.markdown(f"<div style='color:#64748b; font-size:0.8rem;'>🕌 Assalamu Alaikum! | 📅 {datetime.now().strftime('%d %b %Y')} | 📆 Salary Cycle 10th → 9th</div>", unsafe_allow_html=True)
-
-# Navigation
+# ---------- NAVIGATION ----------
 nav = st.radio("Menu", ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"], index=0, horizontal=True, key='nav_radio')
 st.session_state.page = nav
 
@@ -582,7 +455,7 @@ if st.session_state.page == "🏠 Home":
     current_month = datetime.now().strftime('%B')
     df_tx = st.session_state.transactions
     
-    # Fetch account balances
+    # Account balances
     accounts_df = st.session_state.accounts
     bob_bal = accounts_df.loc[accounts_df['Account']=='BOB Bank', 'Balance'].values[0] if not accounts_df.empty else 0
     bom_bal = accounts_df.loc[accounts_df['Account']=='BOM Bank', 'Balance'].values[0] if not accounts_df.empty else 0
@@ -590,6 +463,7 @@ if st.session_state.page == "🏠 Home":
     cash_bal = accounts_df.loc[accounts_df['Account']=='Cash', 'Balance'].values[0] if not accounts_df.empty else 0
     bc_bal = accounts_df.loc[accounts_df['Account']=='💳 BC (Bachat Gat)', 'Balance'].values[0] if not accounts_df.empty else 0
     
+    # Monthly summary
     monthly_inc = 0
     monthly_exp = 0
     if not df_tx.empty:
@@ -601,60 +475,131 @@ if st.session_state.page == "🏠 Home":
     savings = monthly_inc - monthly_exp
     total_budget_val = st.session_state.budget['Current Month Budget'].sum()
     
+    # ---------- INVESTMENT CARDS ----------
     inv_df = st.session_state.investments
+    
+    # Total Investment (sab milakar)
+    total_invested = inv_df['Total Invested'].sum() if not inv_df.empty else 0
+    total_current = inv_df['Current Value'].sum() if not inv_df.empty else 0
+    
+    # Sirf SIP + Gold (auto-fetch se update hoga)
     if not inv_df.empty and 'Name' in inv_df.columns:
-        sip_mask = inv_df['Name'].str.upper() == 'SIP'
-        gold_mask = inv_df['Name'].str.upper() == 'GOLD'
-        sip_inv = inv_df.loc[sip_mask, 'Total Invested'].sum() if sip_mask.any() else 0
-        gold_inv = inv_df.loc[gold_mask, 'Total Invested'].sum() if gold_mask.any() else 0
-        sip_curr = inv_df.loc[sip_mask, 'Current Value'].sum() if sip_mask.any() else 0
-        gold_curr = inv_df.loc[gold_mask, 'Current Value'].sum() if gold_mask.any() else 0
+        # SIP - case insensitive
+        sip_mask = inv_df['Name'].str.upper().str.contains('SIP', na=False)
+        gold_mask = inv_df['Name'].str.upper().str.contains('GOLD', na=False)
+        sip_gold_mask = sip_mask | gold_mask
+        
+        sip_gold_inv = inv_df.loc[sip_gold_mask, 'Total Invested'].sum() if sip_gold_mask.any() else 0
+        sip_gold_curr = inv_df.loc[sip_gold_mask, 'Current Value'].sum() if sip_gold_mask.any() else 0
     else:
-        sip_inv = gold_inv = sip_curr = gold_curr = 0
-    
-    total_invested = sip_inv + gold_inv
-    current_value = sip_curr + gold_curr
-    
-    total_emi_remaining = st.session_state.emi['Remaining'].sum() if not st.session_state.emi.empty else 0
-    total_emi_due = st.session_state.emi['EMI Amount'].sum() if not st.session_state.emi.empty else 0
+        sip_gold_inv = 0
+        sip_gold_curr = 0
 
-    # Row 1: Accounts (4 columns - BOB, BOM, PhonePe, Cash)
+    # Row 1: Bank Accounts
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🏦 BOB Bank</div><div class='sheet-card-value'>{format_currency(bob_bal)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>🏦 BOB Bank</div>
+            <div class='sheet-card-value' style='color:#6366f1;'>{format_currency(bob_bal)}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🏦 BOM Bank</div><div class='sheet-card-value'>{format_currency(bom_bal)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>🏦 BOM Bank</div>
+            <div class='sheet-card-value' style='color:#8b5cf6;'>{format_currency(bom_bal)}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col3:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📱 PhonePe Wallet</div><div class='sheet-card-value'>{format_currency(upi_bal)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>📱 PhonePe Wallet</div>
+            <div class='sheet-card-value' style='color:#06b6d4;'>{format_currency(upi_bal)}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col4:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💵 Cash</div><div class='sheet-card-value'>{format_currency(cash_bal)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>💵 Cash</div>
+            <div class='sheet-card-value' style='color:#10b981;'>{format_currency(cash_bal)}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Row 2: Income, Expense, Budget
     col5, col6, col7 = st.columns(3)
     with col5:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Income</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
-    with col6:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Total Expense</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(monthly_exp)}</div><div class='sheet-card-sub'>This Month</div></div>", unsafe_allow_html=True)
-    with col7:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 This Month Budget</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
-
-    # Row 3: Investment, EMI, BC (now BC is an account, not a sum)
-    col9, col10, col11 = st.columns(3)
-    with col9:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📈 Total Invested (SIP+Gold)</div><div class='sheet-card-value' style='color:#10b981;'>{format_currency(total_invested)}</div><div class='sheet-card-sub'>Current Value: {format_currency(current_value)}</div></div>", unsafe_allow_html=True)
-    with col10:
         st.markdown(f"""
         <div class='sheet-card'>
-            <div class='sheet-card-header'>🏦 EMI Summary</div>
-            <div class='sheet-card-value' style='color:#ef4444;'>{format_currency(total_emi_remaining)}</div>
-            <div class='sheet-card-sub'>Monthly EMI: {format_currency(total_emi_due)}</div>
-            <div class='sheet-card-sub' style='font-size:0.5rem;'>(Auto-debits update Remaining)</div>
+            <div class='sheet-card-header'>📈 Total Income</div>
+            <div class='sheet-card-value' style='color:#10b981;'>{format_currency(monthly_inc)}</div>
+            <div class='sheet-card-sub'>This Month</div>
         </div>
         """, unsafe_allow_html=True)
-    with col11:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💳 BC (Bachat Gat)</div><div class='sheet-card-value' style='color:#3b82f6;'>{format_currency(bc_bal)}</div><div class='sheet-card-sub'>Account Balance</div></div>", unsafe_allow_html=True)
+    with col6:
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>📉 Total Expense</div>
+            <div class='sheet-card-value' style='color:#ef4444;'>{format_currency(monthly_exp)}</div>
+            <div class='sheet-card-sub'>This Month</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col7:
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>🎯 This Month Budget</div>
+            <div class='sheet-card-value' style='color:#f59e0b;'>{format_currency(total_budget_val)}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Row 4: AI Insights
+    # Row 3: Investment Cards (3 alag cards)
+    col_inv1, col_inv2, col_inv3 = st.columns(3)
+    with col_inv1:
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>📈 Total Investment</div>
+            <div class='sheet-card-value' style='color:#8b5cf6;'>{format_currency(total_invested)}</div>
+            <div class='sheet-card-sub'>Current Value: {format_currency(total_current)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_inv2:
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>🥇 Gold + SIP</div>
+            <div class='sheet-card-value' style='color:#f59e0b;'>{format_currency(sip_gold_inv)}</div>
+            <div class='sheet-card-sub'>Current Value: {format_currency(sip_gold_curr)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_inv3:
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>💳 BC (Bachat Gat)</div>
+            <div class='sheet-card-value' style='color:#ec4899;'>{format_currency(bc_bal)}</div>
+            <div class='sheet-card-sub'>Your Savings Pool</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Row 4: EMI Summary
+    total_emi_remaining = st.session_state.emi['Remaining'].sum() if not st.session_state.emi.empty else 0
+    total_emi_due = st.session_state.emi['EMI Amount'].sum() if not st.session_state.emi.empty else 0
+    
+    col_emi1, col_emi2 = st.columns(2)
+    with col_emi1:
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>🏦 EMI Remaining</div>
+            <div class='sheet-card-value' style='color:#ef4444;'>{format_currency(total_emi_remaining)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_emi2:
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>📆 Monthly EMI</div>
+            <div class='sheet-card-value' style='color:#6366f1;'>{format_currency(total_emi_due)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Row 5: AI Insights
     st.markdown("### 🤖 AI Insights")
     col_ai1, col_ai2 = st.columns(2)
     with col_ai1:
@@ -675,7 +620,7 @@ if st.session_state.page == "🏠 Home":
         else:
             st.info("No income recorded yet.")
 
-    # Row 5: Recent Transactions
+    # Row 6: Recent Transactions
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
     if not recent.empty:
@@ -683,7 +628,7 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No transactions yet.")
 
-    # Row 6: Manual Sync
+    # Row 7: Manual Sync
     st.markdown("---")
     col_sync1, col_sync2 = st.columns([3, 1])
     with col_sync1:
@@ -701,19 +646,8 @@ elif st.session_state.page == "➕ Add":
     st.subheader("➕ Add Transaction")
     
     budget_cats = st.session_state.budget['Category'].tolist()
-    inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
-    emi_names = st.session_state.emi['Loan Name'].tolist() if not st.session_state.emi.empty else []
-    goal_names = st.session_state.goals['Goal Name'].tolist() if not st.session_state.goals.empty else []
-    
-    custom_cats = st.session_state.custom_categories['Category'].tolist() if not st.session_state.custom_categories.empty else []
-    all_cats = list(set(['Transfer', 'Hand Loan'] + budget_cats + inv_names + emi_names + goal_names + custom_cats))
-    all_cats = sorted(all_cats)
-    
-    if 'add_transaction_type' not in st.session_state:
-        st.session_state.add_transaction_type = st.session_state.get('add_type', 'Income')
-    
-    def on_type_change():
-        st.session_state.add_transaction_type = st.session_state.selected_type
+    if 'BC' not in budget_cats:
+        budget_cats.append('BC')
     
     col1, col2 = st.columns(2)
     with col1:
@@ -721,72 +655,77 @@ elif st.session_state.page == "➕ Add":
         desc = st.text_input("Description")
         amount = st.number_input("Amount ₹", min_value=0.0)
     with col2:
-        custom_type_names = st.session_state.custom_types['TypeName'].tolist() if not st.session_state.custom_types.empty else []
-        default_types = ["Income", "Expense", "Investment", "Transfer", "BC"]
-        all_types = list(set(default_types + custom_type_names))
-        all_types = sorted(all_types)
+        # ---------- TYPE SELECTION ----------
+        type_options = ["Expense", "Income", "Transfer", "Investment", "Loan"]
+        ttype = st.selectbox("Type", type_options)
         
-        ttype = st.selectbox("Type", all_types, index=all_types.index(st.session_state.add_transaction_type) if st.session_state.add_transaction_type in all_types else 0, key='selected_type', on_change=on_type_change)
-        st.session_state.add_transaction_type = ttype
-        
-        # For BC type, set nature to Income (PLUS)
-        if is_bc_type(ttype):
-            nature = "Income"
-            # Force payment mode to BC account
-            payment_mode = "💳 BC (Bachat Gat)"
-            # Force category to BC
-            category = "BC"
-        else:
-            default_nature_map = {
-                "Income": "Income",
-                "Expense": "Expense",
-                "Investment": "Expense",
-                "Transfer": "Neutral"
-            }
-            custom_nature = None
-            if ttype in st.session_state.custom_types['TypeName'].values:
-                custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
-            nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
-            if nature is None or nature == "Neutral":
+        # ---------- LOAN SUB-TYPE ----------
+        loan_subtype = None
+        if ttype == "Loan":
+            loan_subtype = st.selectbox("Loan Action", ["Loan Taken", "Loan Returned"])
+            if loan_subtype == "Loan Taken":
                 nature = "Income"
+                payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+                category = "Loan Taken"
+                st.info("💡 Loan Taken → Income (balance will increase)")
+            else:  # Loan Returned
+                nature = "Expense"
+                payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+                category = "Loan Returned"
+                st.info("💡 Loan Returned → Expense (balance will decrease)")
+        else:
+            # ---------- NATURE AUTO-DETECT ----------
+            if ttype == "Income":
+                nature = "Income"
+                category = st.selectbox("Category", ["Salary", "Freelance", "Bonus", "Gift", "Other Income"])
+                payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+                st.info("💡 Income → Balance will increase")
+                
+            elif ttype == "Expense":
+                nature = "Expense"
+                category = st.selectbox("Category", budget_cats + ["Other"])
+                payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+                st.info("💡 Expense → Balance will decrease")
+                
+            elif ttype == "Transfer":
+                nature = "Neutral"
+                category = "Transfer"
+                payment_mode = "Transfer"
+                st.info("💡 Transfer → No balance change (account to account)")
+                
+            elif ttype == "Investment":
+                nature = "Expense"
+                # Investment categories
+                inv_cats = ["SIP", "Gold", "MF", "Stocks", "BC", "Other Investment"]
+                category = st.selectbox("Category", inv_cats)
+                payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
+                
+                # Special handling for BC
+                if category == "BC":
+                    st.info("💡 BC (Bachat Gat) → Your savings will increase (tracked separately)")
+                else:
+                    st.info("💡 Investment → Balance will decrease (asset purchased)")
             
-            # AI Nature Detection for non-BC types
-            ai_nature = ai_detect_nature(desc, "", amount, ttype) if desc else None
-            if ai_nature:
-                nature = ai_nature
-            
-            # Payment Mode selection
-            payment_options = ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash", "💳 BC (Bachat Gat)"]
-            payment_mode = st.selectbox("Payment Mode", payment_options)
-            
-            # Category selection for non-BC
-            category = None
-            if ttype != "Income" and nature != "Income":
-                category = st.selectbox("Category", all_cats)
-            else:
-                category = "Salary" if ttype == "Income" else "General"
-                st.text(f"Category: {category} (auto-set)")
-        
-        # Display nature
-        st.text(f"Nature: {nature} (auto-assigned by AI)")
-        
-        # For BC, we already set category above, but if not, show it
-        if not is_bc_type(ttype):
-            pass  # already set
+            # Display Nature
+            st.markdown(f"**Nature:** `{nature}` (auto-detected)")
     
-    # Transfer fields
+    # ---------- TRANSFER FIELDS ----------
     from_acc = None
     to_acc = None
     if ttype == "Transfer":
+        st.markdown("---")
+        st.subheader("Transfer Details")
         from_acc = st.selectbox("From Account", st.session_state.accounts['Account'], key='from')
         to_acc = st.selectbox("To Account", st.session_state.accounts['Account'], key='to')
         if from_acc == to_acc:
             st.warning("⚠️ From and To accounts must be different.")
     
-    # EMI fields
-    is_emi = (ttype == "Expense") and (category in emi_names or (category and 'emi' in category.lower()))
+    # ---------- EMI FIELDS ----------
+    is_emi = (ttype == "Expense") and (category and 'emi' in category.lower())
     emi_loan = None
     if is_emi:
+        st.markdown("---")
+        st.subheader("EMI Payment")
         if not st.session_state.emi.empty:
             loan_options = st.session_state.emi['Loan Name'].tolist()
             emi_loan = st.selectbox("Select Loan for this EMI payment", loan_options)
@@ -796,39 +735,29 @@ elif st.session_state.page == "➕ Add":
         else:
             st.info("No EMI loans added yet. Go to More > EMI to add a loan.")
     
-    # Investment fields
-    is_investment = (ttype == "Investment") or (category and category in inv_names)
+    # ---------- INVESTMENT FIELDS ----------
+    is_investment = (ttype == "Investment" and category != "BC")
     inv_name = None
-    inv_units = 0.0
     if is_investment:
-        existing_inv = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
-        if category and category in existing_inv:
-            inv_name = category
-        else:
-            inv_options = ['New Investment'] + existing_inv
-            inv_name = st.selectbox("Select Investment", inv_options)
-            if inv_name == 'New Investment':
-                inv_name = st.text_input("Enter new investment name")
-        if inv_name and inv_name in existing_inv:
+        st.markdown("---")
+        st.subheader("Investment Details")
+        inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
+        inv_options = ['New Investment'] + inv_names
+        inv_name = st.selectbox("Select Investment", inv_options)
+        if inv_name == 'New Investment':
+            inv_name = st.text_input("Enter new investment name")
+        if inv_name and inv_name in inv_names:
             inv_row = st.session_state.investments[st.session_state.investments['Name'] == inv_name]
             if not inv_row.empty:
                 st.info(f"Current Total Invested: {format_currency(inv_row.iloc[0]['Total Invested'])}")
-                if 'Gold' in inv_name or 'Axis Gold Fund' in inv_name:
-                    inv_units = inv_row.iloc[0].get('Units', 0.0)
-                    if 'Gold' in inv_name:
-                        price = get_gold_price_inr_per_gram()
-                        if price:
-                            st.info(f"💡 Current Gold price: ₹{price}/gram. Your units: {inv_units:.4f}g → Value: {format_currency(inv_units*price)}")
-                    elif 'Axis Gold Fund' in inv_name:
-                        nav = get_axis_gold_fund_nav()
-                        if nav:
-                            st.info(f"💡 Current NAV: ₹{nav:.4f}. Your units: {inv_units:.4f} → Value: {format_currency(inv_units*nav)}")
     
-    # Fuel fields
+    # ---------- FUEL FIELDS ----------
     is_fuel = (ttype == "Expense") and (category == 'Fuel' or (category and 'fuel' in category.lower()))
     f_dist = None
     f_litres = None
     if is_fuel:
+        st.markdown("---")
+        st.subheader("Fuel Details")
         f_dist = st.number_input("Distance (km)", min_value=0.0, step=1.0)
         f_litres = st.number_input("Fuel (L)", min_value=0.0, step=0.1)
         if not desc.strip():
@@ -837,116 +766,156 @@ elif st.session_state.page == "➕ Add":
             else:
                 desc = f"Fuel - {f_litres:.1f} L"
     
+    # ---------- SUBMIT BUTTON ----------
     if st.button("✅ Add Transaction", key="submit_btn"):
         success_msg = None
         error_msg = None
-        try:
-            new_row = [date.strftime('%Y-%m-%d'), desc, category, amount, ttype, payment_mode, '✅']
-            new_df = pd.DataFrame([{
-                'Date': date.strftime('%Y-%m-%d'), 'Description': desc, 'Category': category,
-                'Amount': amount, 'Type': ttype, 'Payment Mode': payment_mode, 'Status': '✅'
-            }])
-            st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
-            append_to_worksheet('Transactions', new_row)
-            
-            # 1. Transfer
-            if ttype == "Transfer" and from_acc and to_acc and from_acc != to_acc:
-                from_idx = st.session_state.accounts[st.session_state.accounts['Account'] == from_acc].index[0]
-                to_idx = st.session_state.accounts[st.session_state.accounts['Account'] == to_acc].index[0]
-                st.session_state.accounts.loc[from_idx, 'Balance'] -= amount
-                st.session_state.accounts.loc[to_idx, 'Balance'] += amount
-                update_worksheet('Accounts', st.session_state.accounts)
-            
-            # 2. Payment Mode Balance (non-transfer)
-            else:
-                acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
-                if not acc_idx.empty:
-                    idx = acc_idx[0]
-                    if nature == "Income":
-                        st.session_state.accounts.loc[idx, 'Balance'] += amount
-                    elif nature in ["Expense", "BC"]:
-                        st.session_state.accounts.loc[idx, 'Balance'] -= amount
+        
+        if amount <= 0:
+            st.error("❌ Amount must be greater than 0!")
+        elif ttype == "Transfer" and from_acc == to_acc:
+            st.error("❌ From and To accounts must be different!")
+        else:
+            try:
+                # Prepare transaction row
+                new_row = [date.strftime('%Y-%m-%d'), desc, category, amount, ttype, payment_mode, '✅']
+                new_df = pd.DataFrame([{
+                    'Date': date.strftime('%Y-%m-%d'), 
+                    'Description': desc, 
+                    'Category': category,
+                    'Amount': amount, 
+                    'Type': ttype, 
+                    'Payment Mode': payment_mode, 
+                    'Status': '✅'
+                }])
+                st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+                append_to_worksheet('Transactions', new_row)
+                
+                # ---------- UPDATE BALANCES ----------
+                # 1. Transfer
+                if ttype == "Transfer" and from_acc and to_acc and from_acc != to_acc:
+                    from_idx = st.session_state.accounts[st.session_state.accounts['Account'] == from_acc].index[0]
+                    to_idx = st.session_state.accounts[st.session_state.accounts['Account'] == to_acc].index[0]
+                    st.session_state.accounts.loc[from_idx, 'Balance'] -= amount
+                    st.session_state.accounts.loc[to_idx, 'Balance'] += amount
                     update_worksheet('Accounts', st.session_state.accounts)
-
-            # 3. EMI
-            if is_emi and ttype == "Expense" and emi_loan and amount > 0:
-                emi_idx = st.session_state.emi[st.session_state.emi['Loan Name'] == emi_loan].index[0]
-                current_remaining = st.session_state.emi.loc[emi_idx, 'Remaining']
-                st.session_state.emi.loc[emi_idx, 'Remaining'] = max(0, current_remaining - amount)
-                update_worksheet('EmiManager', st.session_state.emi)
-            
-            # 4. Investment
-            if is_investment and inv_name and amount > 0:
-                price_per_unit = None
-                if 'Gold' in inv_name:
-                    price_per_unit = get_gold_price_inr_per_gram()
-                elif 'Axis Gold Fund' in inv_name:
-                    price_per_unit = get_axis_gold_fund_nav()
-                units_added = 0.0
-                if price_per_unit and price_per_unit > 0:
-                    units_added = amount / price_per_unit
-                if inv_name in st.session_state.investments['Name'].values:
-                    idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
-                    st.session_state.investments.loc[idx_inv, 'Total Invested'] += amount
-                    if 'Current Value' in st.session_state.investments.columns:
-                        st.session_state.investments.loc[idx_inv, 'Current Value'] += amount
-                    if units_added > 0:
-                        st.session_state.investments.loc[idx_inv, 'Units'] = st.session_state.investments.loc[idx_inv, 'Units'] + units_added
+                
+                # 2. Payment Mode Balance (non-transfer)
                 else:
-                    new_inv = pd.DataFrame({
-                        'Name': [inv_name],
-                        'Type': ['Other'],
-                        'Amount': [0],
-                        'Frequency': ['Monthly'],
-                        'Total Invested': [amount],
-                        'Current Value': [amount],
-                        'Units': [units_added]
+                    # If BC category, we need to update BC account balance (plus) and payment account (minus)
+                    if category == "BC" and ttype == "Investment":
+                        # Update BC account - PLUS
+                        bc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == '💳 BC (Bachat Gat)'].index[0]
+                        st.session_state.accounts.loc[bc_idx, 'Balance'] += amount
+                        
+                        # Update payment account - MINUS
+                        acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
+                        if not acc_idx.empty:
+                            idx = acc_idx[0]
+                            st.session_state.accounts.loc[idx, 'Balance'] -= amount
+                        update_worksheet('Accounts', st.session_state.accounts)
+                    
+                    else:
+                        # Normal transaction
+                        acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
+                        if not acc_idx.empty:
+                            idx = acc_idx[0]
+                            if nature == "Income":
+                                st.session_state.accounts.loc[idx, 'Balance'] += amount
+                            elif nature in ["Expense", "Neutral"]:
+                                if ttype != "Transfer":
+                                    st.session_state.accounts.loc[idx, 'Balance'] -= amount
+                            update_worksheet('Accounts', st.session_state.accounts)
+
+                # 3. EMI
+                if is_emi and ttype == "Expense" and emi_loan and amount > 0:
+                    emi_idx = st.session_state.emi[st.session_state.emi['Loan Name'] == emi_loan].index[0]
+                    current_remaining = st.session_state.emi.loc[emi_idx, 'Remaining']
+                    st.session_state.emi.loc[emi_idx, 'Remaining'] = max(0, current_remaining - amount)
+                    update_worksheet('EmiManager', st.session_state.emi)
+                
+                # 4. Investment (SIP/Gold/MF/Stocks - not BC)
+                if is_investment and inv_name and amount > 0:
+                    # Calculate units for Gold/SIP if possible
+                    price_per_unit = None
+                    if 'Gold' in inv_name:
+                        price_per_unit = get_gold_price_inr_per_gram()
+                    elif 'SIP' in inv_name or 'MF' in inv_name:
+                        # Try to get NAV for SIP/MF
+                        try:
+                            # For Axis Gold Fund
+                            if 'Axis' in inv_name or 'Gold Fund' in inv_name:
+                                price_per_unit = get_axis_gold_fund_nav()
+                        except:
+                            pass
+                    
+                    units_added = 0.0
+                    if price_per_unit and price_per_unit > 0:
+                        units_added = amount / price_per_unit
+                    
+                    if inv_name in st.session_state.investments['Name'].values:
+                        idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
+                        st.session_state.investments.loc[idx_inv, 'Total Invested'] += amount
+                        if 'Current Value' in st.session_state.investments.columns:
+                            st.session_state.investments.loc[idx_inv, 'Current Value'] += amount
+                        if units_added > 0:
+                            st.session_state.investments.loc[idx_inv, 'Units'] = st.session_state.investments.loc[idx_inv, 'Units'] + units_added
+                    else:
+                        new_inv = pd.DataFrame({
+                            'Name': [inv_name],
+                            'Type': ['Other'],
+                            'Amount': [0],
+                            'Frequency': ['Monthly'],
+                            'Total Invested': [amount],
+                            'Current Value': [amount],
+                            'Units': [units_added]
+                        })
+                        st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
+                    update_worksheet('Investments', st.session_state.investments)
+                
+                # 5. Fuel
+                if is_fuel and ttype == "Expense" and f_dist is not None and f_litres is not None:
+                    fuel_row = [date.strftime('%Y-%m-%d'), f_dist, f_litres, amount]
+                    st.session_state.fuel = pd.concat([st.session_state.fuel, pd.DataFrame([{
+                        'Date': date.strftime('%Y-%m-%d'),
+                        'Distance (km)': f_dist,
+                        'Fuel (L)': f_litres,
+                        'Cost (₹)': amount
+                    }])], ignore_index=True)
+                    update_worksheet('FuelTracker', st.session_state.fuel)
+                
+                # 6. Auto-sync Category to Budget
+                if category not in st.session_state.budget['Category'].values and category not in ['Transfer', 'Loan Taken', 'Loan Returned', 'BC']:
+                    new_budget_row = pd.DataFrame({
+                        'Category': [category],
+                        'Current Month Budget': [0.0],
+                        'Previous Month Budget': [0.0],
+                        'Actual This Month': [amount if ttype == 'Expense' else 0.0]
                     })
-                    st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
-                update_worksheet('Investments', st.session_state.investments)
-            
-            # 5. Fuel
-            if is_fuel and ttype == "Expense" and f_dist is not None and f_litres is not None:
-                fuel_row = [date.strftime('%Y-%m-%d'), f_dist, f_litres, amount]
-                st.session_state.fuel = pd.concat([st.session_state.fuel, pd.DataFrame([{
-                    'Date': date.strftime('%Y-%m-%d'),
-                    'Distance (km)': f_dist,
-                    'Fuel (L)': f_litres,
-                    'Cost (₹)': amount
-                }])], ignore_index=True)
-                update_worksheet('FuelTracker', st.session_state.fuel)
-            
-            # 6. Auto-sync Category to Budget
-            if category not in budget_cats and category not in ['Transfer', 'Hand Loan']:
-                new_budget_row = pd.DataFrame({
-                    'Category': [category],
-                    'Current Month Budget': [0.0],
-                    'Previous Month Budget': [0.0],
-                    'Actual This Month': [amount if ttype == 'Expense' else 0.0]
-                })
-                st.session_state.budget = pd.concat([st.session_state.budget, new_budget_row], ignore_index=True)
-                update_worksheet('Budget', st.session_state.budget)
-            
-            # 7. Update Budget Actual
-            if ttype in ['Expense', 'Investment']:
-                if category in st.session_state.budget['Category'].values:
-                    cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
-                    current_actual = st.session_state.budget.loc[cat_idx, 'Actual This Month']
-                    st.session_state.budget.loc[cat_idx, 'Actual This Month'] = current_actual + amount
+                    st.session_state.budget = pd.concat([st.session_state.budget, new_budget_row], ignore_index=True)
                     update_worksheet('Budget', st.session_state.budget)
-            
-            success_msg = "✅ Transaction Saved Successfully! (Balances, Budget, EMI, Fuel, Investments updated)"
-        except Exception as e:
-            error_msg = f"❌ Error: {e}"
+                
+                # 7. Update Budget Actual
+                if ttype in ['Expense', 'Investment'] and category != 'BC':
+                    if category in st.session_state.budget['Category'].values:
+                        cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
+                        current_actual = st.session_state.budget.loc[cat_idx, 'Actual This Month']
+                        st.session_state.budget.loc[cat_idx, 'Actual This Month'] = current_actual + amount
+                        update_worksheet('Budget', st.session_state.budget)
+                
+                success_msg = "✅ Transaction Saved Successfully!"
+            except Exception as e:
+                error_msg = f"❌ Error: {e}"
         
         if success_msg:
             st.success(success_msg)
         if error_msg:
             st.error(error_msg)
         
-        st.session_state.page = "🏠 Home"
-        st.cache_data.clear()
-        st.rerun()
+        if success_msg:
+            st.session_state.page = "🏠 Home"
+            st.cache_data.clear()
+            st.rerun()
 
     st.markdown("---")
     st.markdown("### 🗑️ Delete a Transaction")
@@ -965,11 +934,14 @@ elif st.session_state.page == "➕ Add":
                 amount = tx['Amount']
                 payment_mode = tx['Payment Mode']
                 
-                if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
-                    cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
-                    st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
-                    update_worksheet('Budget', st.session_state.budget)
+                # Reverse budget
+                if ttype in ['Expense', 'Investment'] and category != 'BC':
+                    if category in st.session_state.budget['Category'].values:
+                        cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
+                        st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
+                        update_worksheet('Budget', st.session_state.budget)
                 
+                # Reverse EMI
                 if ttype == 'Expense' and 'EMI' in category and not st.session_state.emi.empty:
                     for loan in st.session_state.emi['Loan Name']:
                         if loan in tx['Description'] or loan in category:
@@ -978,19 +950,34 @@ elif st.session_state.page == "➕ Add":
                             update_worksheet('EmiManager', st.session_state.emi)
                             break
                 
+                # Reverse Investment (including BC)
                 if ttype == 'Investment':
-                    inv_name = None
-                    for inv in st.session_state.investments['Name']:
-                        if inv in tx['Description'] or inv in category:
-                            inv_name = inv
-                            break
-                    if inv_name and inv_name in st.session_state.investments['Name'].values:
-                        idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
-                        st.session_state.investments.loc[idx_inv, 'Total Invested'] -= amount
-                        if 'Current Value' in st.session_state.investments.columns:
-                            st.session_state.investments.loc[idx_inv, 'Current Value'] -= amount
-                        update_worksheet('Investments', st.session_state.investments)
+                    # If BC, reverse BC account balance
+                    if category == 'BC':
+                        bc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == '💳 BC (Bachat Gat)'].index[0]
+                        st.session_state.accounts.loc[bc_idx, 'Balance'] -= amount
+                        
+                        # Reverse payment account
+                        acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
+                        if not acc_idx.empty:
+                            idx_acc = acc_idx[0]
+                            st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
+                        update_worksheet('Accounts', st.session_state.accounts)
+                    else:
+                        # Normal investment reversal
+                        inv_name = None
+                        for inv in st.session_state.investments['Name']:
+                            if inv in tx['Description'] or inv in category:
+                                inv_name = inv
+                                break
+                        if inv_name and inv_name in st.session_state.investments['Name'].values:
+                            idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
+                            st.session_state.investments.loc[idx_inv, 'Total Invested'] -= amount
+                            if 'Current Value' in st.session_state.investments.columns:
+                                st.session_state.investments.loc[idx_inv, 'Current Value'] -= amount
+                            update_worksheet('Investments', st.session_state.investments)
                 
+                # Reverse Fuel
                 if ttype == 'Expense' and 'Fuel' in category:
                     fuel_idx = st.session_state.fuel[
                         (st.session_state.fuel['Date'] == tx['Date']) & 
@@ -1000,31 +987,22 @@ elif st.session_state.page == "➕ Add":
                         st.session_state.fuel = st.session_state.fuel.drop(fuel_idx[0]).reset_index(drop=True)
                         update_worksheet('FuelTracker', st.session_state.fuel)
                 
-                if ttype != "Transfer":
+                # Reverse normal transaction (if not handled above)
+                if ttype != "Transfer" and not (ttype == 'Investment' and category == 'BC'):
                     acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                     if not acc_idx.empty:
                         idx_acc = acc_idx[0]
-                        
-                        # Reverse nature
-                        if is_bc_type(ttype):
-                            rev_nature = "Income"  # BC is income, so reverse it (minus)
+                        # Determine nature for reversal
+                        if ttype == "Income":
+                            rev_nature = "Income"
+                        elif ttype in ["Expense", "Investment"]:
+                            rev_nature = "Expense"
                         else:
-                            rev_nature = ai_detect_nature(tx.get('Description',''), category, amount, ttype)
-                            if not rev_nature:
-                                default_nature_map = {
-                                    "Income": "Income",
-                                    "Expense": "Expense",
-                                    "Investment": "Expense",
-                                    "Transfer": "Neutral"
-                                }
-                                custom_nature = None
-                                if ttype in st.session_state.custom_types['TypeName'].values:
-                                    custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
-                                rev_nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                            rev_nature = "Neutral"
                         
                         if rev_nature == "Income":
-                            st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount  # reverse the plus
-                        elif rev_nature in ["Expense", "BC"]:
+                            st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount
+                        elif rev_nature == "Expense":
                             st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
                         update_worksheet('Accounts', st.session_state.accounts)
                 
@@ -1062,15 +1040,36 @@ elif st.session_state.page == "🎯 Budget":
     st.markdown("### 📊 Monthly Overview")
     col_t1, col_t2, col_t3, col_t4 = st.columns(4)
     with col_t1:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>💰 Category Budget</div><div class='sheet-card-value'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>💰 Category Budget</div>
+            <div class='sheet-card-value' style='color:#6366f1;'>{format_currency(total_budget_val)}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col_t2:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>🎯 Master Cap</div><div class='sheet-card-value'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>🎯 Master Cap</div>
+            <div class='sheet-card-value' style='color:#8b5cf6;'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col_t3:
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>📉 Total Spent</div><div class='sheet-card-value' style='color:#ef4444;'>{format_currency(total_spent_val)}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>📉 Total Spent</div>
+            <div class='sheet-card-value' style='color:#ef4444;'>{format_currency(total_spent_val)}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col_t4:
         status_color = "#10b981" if remaining_val >= 0 else "#ef4444"
         status_text = "✅ On Track" if remaining_val >= 0 else "⚠️ Over Budget"
-        st.markdown(f"<div class='sheet-card'><div class='sheet-card-header'>✅ Remaining</div><div class='sheet-card-value' style='color:{status_color};'>{format_currency(remaining_val)}</div><div class='sheet-card-sub'>{status_text}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='sheet-card'>
+            <div class='sheet-card-header'>✅ Remaining</div>
+            <div class='sheet-card-value' style='color:{status_color};'>{format_currency(remaining_val)}</div>
+            <div class='sheet-card-sub'>{status_text}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with st.expander("✏️ Set Overall Monthly Budget Cap"):
         new_master = st.number_input("Enter your ideal monthly budget cap (₹)", value=master_budget, step=500.0)
@@ -1119,7 +1118,7 @@ elif st.session_state.page == "🎯 Budget":
             st.info("No categories to delete.")
 
         st.markdown("---")
-        st.markdown("### ✏️ Edit Category (Actual This Month auto-updates)")
+        st.markdown("### ✏️ Edit Category")
         new_cat = st.text_input("New Category Name (Leave blank to edit existing)")
         sel_cat = st.selectbox("Or select existing to edit", df['Category'].tolist() + ["New"])
         
@@ -1244,7 +1243,7 @@ elif st.session_state.page == "🏦 Bank":
             else:
                 st.error("Amount must be greater than 0.")
 
-    # 🔴 Reset All Balances to Zero
+    # 🔴 Reset All Balances
     st.markdown("---")
     with st.expander("⚠️ Reset All Account Balances to Zero"):
         st.error("This will set all bank, wallet, cash, and BC balances to ₹0. This action cannot be undone.")
@@ -1269,7 +1268,7 @@ elif st.session_state.page == "⚡ More":
     all_cats = sorted(all_cats)
 
     custom_type_names = st.session_state.custom_types['TypeName'].tolist() if not st.session_state.custom_types.empty else []
-    default_types = ["Income", "Expense", "Investment", "Transfer", "BC"]
+    default_types = ["Income", "Expense", "Investment", "Transfer"]
     all_types = list(set(default_types + custom_type_names))
     all_types = sorted(all_types)
 
@@ -1278,7 +1277,9 @@ elif st.session_state.page == "⚡ More":
     # ---------- Investments ----------
     with tabs[0]:
         st.markdown("#### 💼 Your Investments")
-        if st.button("🔄 Update Current Values (Gold & Axis Gold Fund)"):
+        
+        # 🔥 AUTO-FETCH CURRENT VALUES (works for existing investments)
+        if st.button("🔄 Update Current Values (Gold & SIP)"):
             updated = False
             for idx, row in st.session_state.investments.iterrows():
                 name = row['Name']
@@ -1287,18 +1288,23 @@ elif st.session_state.page == "⚡ More":
                     if price and row['Units'] > 0:
                         st.session_state.investments.loc[idx, 'Current Value'] = row['Units'] * price
                         updated = True
-                elif 'Axis Gold Fund' in name:
-                    nav = get_axis_gold_fund_nav()
-                    if nav and row['Units'] > 0:
-                        st.session_state.investments.loc[idx, 'Current Value'] = row['Units'] * nav
-                        updated = True
+                elif 'SIP' in name or 'MF' in name:
+                    # Try to get NAV for SIP/MF
+                    try:
+                        if 'Axis' in name or 'Gold Fund' in name:
+                            nav = get_axis_gold_fund_nav()
+                            if nav and row['Units'] > 0:
+                                st.session_state.investments.loc[idx, 'Current Value'] = row['Units'] * nav
+                                updated = True
+                    except:
+                        pass
             if updated:
                 update_worksheet('Investments', st.session_state.investments)
                 st.cache_data.clear()
                 st.success("✅ Current values updated from live prices!")
                 st.rerun()
             else:
-                st.info("No Gold/Axis Gold Fund investments with units found. Please add some transactions first.")
+                st.info("No investments with units found. Add transactions with Gold/SIP to track.")
         
         st.dataframe(st.session_state.investments, hide_index=True, use_container_width=True)
         
@@ -1316,10 +1322,14 @@ elif st.session_state.page == "⚡ More":
                             price = get_gold_price_inr_per_gram()
                             if price:
                                 st.session_state.investments.loc[idx, 'Current Value'] = new_units * price
-                        elif 'Axis Gold Fund' in name:
-                            nav = get_axis_gold_fund_nav()
-                            if nav:
-                                st.session_state.investments.loc[idx, 'Current Value'] = new_units * nav
+                        elif 'SIP' in name or 'MF' in name:
+                            try:
+                                if 'Axis' in name or 'Gold Fund' in name:
+                                    nav = get_axis_gold_fund_nav()
+                                    if nav:
+                                        st.session_state.investments.loc[idx, 'Current Value'] = new_units * nav
+                            except:
+                                pass
                         update_worksheet('Investments', st.session_state.investments)
                         st.cache_data.clear()
                         st.success("Units updated!")
@@ -1327,7 +1337,7 @@ elif st.session_state.page == "⚡ More":
             else:
                 st.info("No investments to edit.")
         
-        with st.expander("➕ Add / Edit Investment (Full details)"):
+        with st.expander("➕ Add Investment (Manual)"):
             inv_name = st.text_input("Investment Name")
             inv_type = st.selectbox("Type", ["SIP", "Gold", "MF", "Stock", "Other"])
             freq = st.selectbox("Frequency", ["Monthly", "Weekly"])
@@ -1355,8 +1365,8 @@ elif st.session_state.page == "⚡ More":
     # ---------- EMI ----------
     with tabs[1]:
         st.dataframe(st.session_state.emi, hide_index=True, use_container_width=True)
-        with st.expander("➕ Add EMI (One-time setup)"):
-            st.info("Add your EMI loan details here. After this, future payments will be auto-synced from transactions.")
+        with st.expander("➕ Add EMI"):
+            st.info("Add your EMI loan details here.")
             loan = st.text_input("Loan Name")
             total = st.number_input("Total Loan ₹", min_value=0.0)
             emi = st.number_input("EMI per Month ₹", min_value=0.0)
@@ -1444,27 +1454,26 @@ elif st.session_state.page == "⚡ More":
             
             inv_df = st.session_state.investments
             if not inv_df.empty:
-                total_inv = inv_df[inv_df['Name'].str.upper().isin(['SIP','GOLD'])]['Total Invested'].sum()
-                curr_val = inv_df[inv_df['Name'].str.upper().isin(['SIP','GOLD'])]['Current Value'].sum()
+                total_inv = inv_df['Total Invested'].sum()
+                curr_val = inv_df['Current Value'].sum()
                 if total_inv > 0:
-                    st.info(f"📈 Investment (SIP+Gold): Total Invested: {format_currency(total_inv)} | Current Value: {format_currency(curr_val)} | ROI: {((curr_val/total_inv)-1)*100:.1f}%")
+                    st.info(f"📈 Total Investment: {format_currency(total_inv)} | Current Value: {format_currency(curr_val)} | ROI: {((curr_val/total_inv)-1)*100:.1f}%")
                 
-                inv_compare = inv_df[inv_df['Name'].str.upper().isin(['SIP','GOLD'])].copy()
-                if not inv_compare.empty:
-                    fig5 = px.bar(inv_compare, x='Name', y=['Total Invested', 'Current Value'], barmode='group', title="📈 SIP & Gold Performance")
-                    fig5.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
-                    st.plotly_chart(fig5, use_container_width=True)
+                # SIP+Gold only
+                sip_gold = inv_df[inv_df['Name'].str.upper().str.contains('SIP|GOLD', na=False)]
+                if not sip_gold.empty:
+                    st.info(f"🥇 Gold + SIP: Invested: {format_currency(sip_gold['Total Invested'].sum())} | Current: {format_currency(sip_gold['Current Value'].sum())}")
             
-            # BC Report - now from account balance
+            # BC
             bc_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='💳 BC (Bachat Gat)', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
-            st.info(f"💳 BC (Bachat Gat) Total Balance: {format_currency(bc_bal)}")
+            st.info(f"💳 BC (Bachat Gat) Balance: {format_currency(bc_bal)}")
         else:
             st.info("Add some transactions to see detailed reports.")
     
     # ---------- Customization ----------
     with tabs[4]:
         st.markdown("### ⚙️ Custom Types, Categories & Natures")
-        st.info("Add your own Transaction Types, Categories, and Natures. They will appear in the Add Transaction dropdowns.")
+        st.info("Add your own Transaction Types, Categories, and Natures.")
         
         col_t1, col_t2 = st.columns(2)
         with col_t1:
@@ -1525,7 +1534,6 @@ elif st.session_state.page == "⚡ More":
                     st.rerun()
         
         st.markdown("#### 🌿 Custom Natures")
-        st.info("Add new natures like 'Neutral', 'Credit', 'Debit'. (Default 'Income' and 'Expense' are protected and cannot be deleted.)")
         if not st.session_state.custom_natures.empty:
             st.dataframe(st.session_state.custom_natures, hide_index=True, use_container_width=True)
         else:
@@ -1565,106 +1573,12 @@ elif st.session_state.page == "⚡ More":
         df = st.session_state.transactions
         if not df.empty:
             st.dataframe(df.sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
-            st.markdown("#### 🗑️ Delete a Transaction")
-            if not df.empty:
-                df_del = df.copy()
-                df_del['Display'] = df_del['Date'].astype(str) + " | " + df_del['Description'].astype(str) + " | ₹" + df_del['Amount'].astype(str)
-                to_delete = st.selectbox("Select transaction to delete", df_del['Display'])
-                if st.button("🗑️ Delete Selected Transaction"):
-                    success_msg = None
-                    error_msg = None
-                    try:
-                        idx = df_del[df_del['Display'] == to_delete].index[0]
-                        tx = st.session_state.transactions.iloc[idx]
-                        ttype = tx['Type']
-                        category = tx['Category']
-                        amount = tx['Amount']
-                        payment_mode = tx['Payment Mode']
-                        
-                        if ttype in ['Expense', 'Investment'] and category in st.session_state.budget['Category'].values:
-                            cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
-                            st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
-                            update_worksheet('Budget', st.session_state.budget)
-                        
-                        if ttype == 'Expense' and 'EMI' in category and not st.session_state.emi.empty:
-                            for loan in st.session_state.emi['Loan Name']:
-                                if loan in tx['Description'] or loan in category:
-                                    emi_idx = st.session_state.emi[st.session_state.emi['Loan Name'] == loan].index[0]
-                                    st.session_state.emi.loc[emi_idx, 'Remaining'] += amount
-                                    update_worksheet('EmiManager', st.session_state.emi)
-                                    break
-                        
-                        if ttype == 'Investment':
-                            inv_name = None
-                            for inv in st.session_state.investments['Name']:
-                                if inv in tx['Description'] or inv in category:
-                                    inv_name = inv
-                                    break
-                            if inv_name and inv_name in st.session_state.investments['Name'].values:
-                                idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
-                                st.session_state.investments.loc[idx_inv, 'Total Invested'] -= amount
-                                if 'Current Value' in st.session_state.investments.columns:
-                                    st.session_state.investments.loc[idx_inv, 'Current Value'] -= amount
-                                update_worksheet('Investments', st.session_state.investments)
-                        
-                        if ttype == 'Expense' and 'Fuel' in category:
-                            fuel_idx = st.session_state.fuel[
-                                (st.session_state.fuel['Date'] == tx['Date']) & 
-                                (st.session_state.fuel['Cost (₹)'] == amount)
-                            ].index
-                            if not fuel_idx.empty:
-                                st.session_state.fuel = st.session_state.fuel.drop(fuel_idx[0]).reset_index(drop=True)
-                                update_worksheet('FuelTracker', st.session_state.fuel)
-                        
-                        if ttype != "Transfer":
-                            acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
-                            if not acc_idx.empty:
-                                idx_acc = acc_idx[0]
-                                
-                                # Reverse nature for BC as Income
-                                if is_bc_type(ttype):
-                                    rev_nature = "Income"
-                                else:
-                                    rev_nature = ai_detect_nature(tx.get('Description',''), category, amount, ttype)
-                                    if not rev_nature:
-                                        default_nature_map = {
-                                            "Income": "Income",
-                                            "Expense": "Expense",
-                                            "Investment": "Expense",
-                                            "Transfer": "Neutral"
-                                        }
-                                        custom_nature = None
-                                        if ttype in st.session_state.custom_types['TypeName'].values:
-                                            custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
-                                        rev_nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
-                                
-                                if rev_nature == "Income":
-                                    st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount
-                                elif rev_nature in ["Expense", "BC"]:
-                                    st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
-                                update_worksheet('Accounts', st.session_state.accounts)
-                        
-                        st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
-                        update_worksheet('Transactions', st.session_state.transactions)
-                        success_msg = "✅ Transaction Deleted successfully!"
-                    except Exception as e:
-                        error_msg = f"❌ Error: {e}"
-                    
-                    if success_msg:
-                        st.success(success_msg)
-                    if error_msg:
-                        st.error(error_msg)
-                    
-                    st.session_state.page = "🏠 Home"
-                    st.cache_data.clear()
-                    st.rerun()
         else:
             st.info("No transactions yet.")
     
     # ---------- Recurring ----------
     with tabs[6]:
         st.markdown("### 🔄 Recurring Transactions")
-        st.info("Add transactions that repeat daily, weekly, or monthly. They will be auto-added on their due date.")
         
         recurring_df = st.session_state.recurring
         st.dataframe(recurring_df, hide_index=True, use_container_width=True)
@@ -1708,11 +1622,38 @@ elif st.session_state.page == "⚡ More":
     # ---------- AI Assistant ----------
     with tabs[7]:
         st.markdown("### 🤖 AI Assistant")
-        st.info("Ask me anything about your finances. I can analyze your spending, suggest budgets, and more.")
+        st.info("Ask me anything about your finances.")
         
-        user_query = st.text_input("Ask a question:", placeholder="E.g., How much did I spend on groceries this month?")
+        # Simple AI response
+        def simple_ai_response(query):
+            df = st.session_state.transactions
+            if df.empty:
+                return "No transactions yet. Add some to get insights!"
+            
+            current_month = datetime.now().strftime('%B')
+            df['Date'] = pd.to_datetime(df['Date'])
+            df_month = df[df['Date'].dt.month_name() == current_month]
+            
+            query_lower = query.lower()
+            if "expense" in query_lower:
+                amt = df_month[df_month['Type']=='Expense']['Amount'].sum()
+                return f"📉 Total expense this month: {format_currency(amt)}"
+            elif "income" in query_lower:
+                amt = df_month[df_month['Type']=='Income']['Amount'].sum()
+                return f"📈 Total income this month: {format_currency(amt)}"
+            elif "saving" in query_lower:
+                inc = df_month[df_month['Type']=='Income']['Amount'].sum()
+                exp = df_month[df_month['Type']=='Expense']['Amount'].sum()
+                return f"💎 Savings this month: {format_currency(inc - exp)}"
+            elif "bc" in query_lower or "bachat" in query_lower:
+                bc_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='💳 BC (Bachat Gat)', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
+                return f"💳 BC (Bachat Gat) balance: {format_currency(bc_bal)}"
+            else:
+                return "I can tell you about: Expense, Income, Savings, BC. Ask me!"
+
+        user_query = st.text_input("Ask a question:", placeholder="E.g., How much expense this month?")
         if user_query:
-            response = ai_assistant_response(user_query)
+            response = simple_ai_response(user_query)
             st.success(f"🤖 {response}")
         else:
-            st.write("💡 Try asking: 'How much did I spend on groceries?', 'What is my total expense?', 'How much savings do I have?' etc.")
+            st.write("💡 Try asking: 'Expense', 'Income', 'Savings', or 'BC'")
