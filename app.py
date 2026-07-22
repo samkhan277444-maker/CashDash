@@ -371,6 +371,14 @@ def init_session_state():
             loaded['Units'] = 0.0
         st.session_state.investments = loaded
 
+    # ---- FIX: Convert columns to float to avoid Pandas int assignment TypeError ----
+    if 'Current Value' in st.session_state.investments.columns:
+        st.session_state.investments['Current Value'] = st.session_state.investments['Current Value'].astype(float)
+    if 'Total Invested' in st.session_state.investments.columns:
+        st.session_state.investments['Total Invested'] = st.session_state.investments['Total Invested'].astype(float)
+    if 'Units' in st.session_state.investments.columns:
+        st.session_state.investments['Units'] = st.session_state.investments['Units'].astype(float)
+
     # EMI
     loaded = all_data.get('EmiManager', pd.DataFrame())
     required_emi_cols = ['Lender','Total Loan','EMI Amount','Tenure (Months)','Interest Charged',
@@ -927,11 +935,11 @@ elif st.session_state.page == "➕ Add":
                         new_inv = pd.DataFrame({
                             'Name': [inv_name],
                             'Type': [category],
-                            'Amount': [0],
+                            'Amount': [0.0],
                             'Frequency': ['Monthly'],
-                            'Total Invested': [amount],
-                            'Current Value': [amount],
-                            'Units': [units_to_add]
+                            'Total Invested': [float(amount)],
+                            'Current Value': [float(amount)],
+                            'Units': [float(units_to_add)]
                         })
                         st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
                     update_worksheet('Investments', st.session_state.investments)
@@ -1349,11 +1357,11 @@ elif st.session_state.page == "⚡ More":
                     new_inv = pd.DataFrame({
                         'Name': [gold_name],
                         'Type': ['Gold'],
-                        'Amount': [0],
+                        'Amount': [0.0],
                         'Frequency': ['Daily'],
-                        'Total Invested': [0],
-                        'Current Value': [0],
-                        'Units': [gold_units]
+                        'Total Invested': [0.0],
+                        'Current Value': [0.0],
+                        'Units': [float(gold_units)]
                     })
                     st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
                 updated = True
@@ -1367,11 +1375,11 @@ elif st.session_state.page == "⚡ More":
                     new_inv = pd.DataFrame({
                         'Name': [axis_name],
                         'Type': ['MF'],
-                        'Amount': [0],
+                        'Amount': [0.0],
                         'Frequency': ['Daily'],
-                        'Total Invested': [0],
-                        'Current Value': [0],
-                        'Units': [axis_units]
+                        'Total Invested': [0.0],
+                        'Current Value': [0.0],
+                        'Units': [float(axis_units)]
                     })
                     st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
                 updated = True
@@ -1465,7 +1473,7 @@ elif st.session_state.page == "⚡ More":
             curr = st.number_input("Current Value ₹", min_value=0.0)
             units = st.number_input("Units (for Gold/Funds)", min_value=0.0, step=0.001, format="%.4f")
             if st.button("Save Investment"):
-                new_inv = pd.DataFrame({'Name':[inv_name], 'Type':[inv_type], 'Amount':[amt], 'Frequency':[freq], 'Total Invested':[invested], 'Current Value':[curr], 'Units':[units]})
+                new_inv = pd.DataFrame({'Name':[inv_name], 'Type':[inv_type], 'Amount':[float(amt)], 'Frequency':[freq], 'Total Invested':[float(invested)], 'Current Value':[float(curr)], 'Units':[float(units)]})
                 st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
                 update_worksheet('Investments', st.session_state.investments)
                 st.cache_data.clear()
