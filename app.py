@@ -249,7 +249,7 @@ def update_settings(key, value):
     except Exception as e:
         st.warning(f"Could not update settings: {e}")
 
-# ---------- LIVE PRICE FUNCTIONS ----------
+# ---------- LIVE PRICE FUNCTIONS (PHONEPE / MCX GOLD & AXIS MF) ----------
 @st.cache_data(ttl=3600)
 def get_gold_price_inr_per_gram():
     try:
@@ -261,22 +261,22 @@ def get_gold_price_inr_per_gram():
         inr_per_usd = rate_data['Close'].iloc[-1]
         price_per_gram = (usd_per_ounce * inr_per_usd) / 31.1035
         return round(price_per_gram, 2)
-    except:
+    except Exception as e:
         return None
 
 @st.cache_data(ttl=3600)
 def get_axis_gold_fund_nav():
     try:
-        scheme_code = 120724
+        scheme_code = 120724  # Axis Gold Fund Regular Growth
         url = f"https://api.mfapi.in/mf/{scheme_code}"
         resp = requests.get(url)
         if resp.status_code == 200:
             data = resp.json()
             nav = float(data['data'][0]['nav'])
-            return nav
+            return round(nav, 4)
         else:
             return None
-    except:
+    except Exception as e:
         return None
 
 # ---------- AI SUBSCRIPTION DETECTIVE ----------
@@ -489,6 +489,20 @@ st.session_state.page = nav
 # ===================== HOME =====================
 if st.session_state.page == "🏠 Home":
     st.markdown("## 📊 Dashboard")
+
+    # Live Price Cards for Gold
+    live_gold_price = get_gold_price_inr_per_gram()
+    if live_gold_price:
+        st.markdown(f"""
+        <div style='display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;'>
+            <div style='background: rgba(255,255,255,0.8); padding: 10px 15px; border-radius: 12px; border-left: 5px solid #f59e0b;'>
+                <span style='font-weight:600; color:#64748b;'>🥇 Live Gold (₹/gm)</span>
+                <span style='font-weight:800; font-size:1.4rem; color:#f59e0b; margin-left:8px;'>₹{live_gold_price}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.warning("⚠️ Could not fetch Live Gold price. Check internet.")
 
     alerts = detect_subscription_anomalies()
     for alert in alerts:
@@ -917,9 +931,13 @@ elif st.session_state.page == "➕ Add":
                         price_per_unit = None
                         if category == "Gold":
                             price_per_unit = get_gold_price_inr_per_gram()
+                            if price_per_unit:
+                                st.info(f"⚡ Live Gold Price: ₹{price_per_unit}/gm")
                         elif category == "SIP":
                             if inv_name and ('Axis' in inv_name or 'Gold Fund' in inv_name):
                                 price_per_unit = get_axis_gold_fund_nav()
+                                if price_per_unit:
+                                    st.info(f"⚡ Live Axis Gold Fund NAV: ₹{price_per_unit}")
                         if price_per_unit and price_per_unit > 0:
                             units_to_add = amount / price_per_unit
                             st.info(f"✅ Auto-calculated {units_to_add:.4f} units at ₹{price_per_unit:.2f} per unit.")
@@ -1346,6 +1364,9 @@ elif st.session_state.page == "⚡ More":
                 axis_units = st.number_input("Axis Gold Fund Units", value=2.932, step=0.001, format="%.3f")
 
             if st.button("✅ Update Portfolio", key="quick_update_portfolio"):
+                # FIX: Convert columns to float before assignment to avoid Pandas TypeError
+                st.session_state.investments['Current Value'] = st.session_state.investments['Current Value'].astype(float)
+                st.session_state.investments['Total Invested'] = st.session_state.investments['Total Invested'].astype(float)
                 updated = False
 
                 # Gold
@@ -1385,7 +1406,7 @@ elif st.session_state.page == "⚡ More":
                 updated = True
 
                 if updated:
-                    # Fetch current values
+                    # Fetch current values using live APIs
                     for idx, row in st.session_state.investments.iterrows():
                         name = row['Name']
                         if 'Gold' in name:
@@ -1406,6 +1427,10 @@ elif st.session_state.page == "⚡ More":
 
         # Auto-update current values
         if st.button("🔄 Update Current Values (Gold & SIP)"):
+            # FIX: Convert column to float immediately to prevent TypeError on assignment
+            if 'Current Value' in st.session_state.investments.columns:
+                st.session_state.investments['Current Value'] = st.session_state.investments['Current Value'].astype(float)
+            
             updated = False
             for idx, row in st.session_state.investments.iterrows():
                 name = row['Name']
@@ -1441,6 +1466,9 @@ elif st.session_state.page == "⚡ More":
                 if not inv_row.empty:
                     new_units = st.number_input("Total Units", value=float(inv_row.iloc[0]['Units']), step=0.001, format="%.4f")
                     if st.button("Update Units"):
+                        # FIX: Convert column to float immediately
+                        st.session_state.investments['Current Value'] = st.session_state.investments['Current Value'].astype(float)
+                        
                         idx = inv_row.index[0]
                         st.session_state.investments.loc[idx, 'Units'] = new_units
                         name = inv_row.iloc[0]['Name']
