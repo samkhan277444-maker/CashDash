@@ -422,7 +422,6 @@ def init_session_state():
             'Balance': [0, 0, 0, 0, 0]
         })
     else:
-        # Ensure BC account exists
         if '💳 BC (Bachat Gat)' not in loaded['Account'].values:
             new_row = pd.DataFrame({'Account': ['💳 BC (Bachat Gat)'], 'Balance': [0]})
             loaded = pd.concat([loaded, new_row], ignore_index=True)
@@ -730,40 +729,50 @@ elif st.session_state.page == "➕ Add":
         ttype = st.selectbox("Type", all_types, index=all_types.index(st.session_state.add_transaction_type) if st.session_state.add_transaction_type in all_types else 0, key='selected_type', on_change=on_type_change)
         st.session_state.add_transaction_type = ttype
         
-        default_nature_map = {
-            "Income": "Income",
-            "Expense": "Expense",
-            "Investment": "Expense",
-            "Transfer": "Neutral",
-            "BC": "Expense"
-        }
-        custom_nature = None
-        if ttype in st.session_state.custom_types['TypeName'].values:
-            custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
-        nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
-        if nature is None or nature == "Neutral":
-            nature = "Income"
-        
-        # AI Nature Detection
-        ai_nature = ai_detect_nature(desc, "", amount, ttype) if desc else None
-        if ai_nature and not is_bc_type(ttype):
-            nature = ai_nature
-        # BC is always Expense
+        # For BC type, set nature to Income (PLUS)
         if is_bc_type(ttype):
-            nature = "Expense"
+            nature = "Income"
+            # Force payment mode to BC account
+            payment_mode = "💳 BC (Bachat Gat)"
+            # Force category to BC
+            category = "BC"
+        else:
+            default_nature_map = {
+                "Income": "Income",
+                "Expense": "Expense",
+                "Investment": "Expense",
+                "Transfer": "Neutral"
+            }
+            custom_nature = None
+            if ttype in st.session_state.custom_types['TypeName'].values:
+                custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+            nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+            if nature is None or nature == "Neutral":
+                nature = "Income"
             
+            # AI Nature Detection for non-BC types
+            ai_nature = ai_detect_nature(desc, "", amount, ttype) if desc else None
+            if ai_nature:
+                nature = ai_nature
+            
+            # Payment Mode selection
+            payment_options = ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash", "💳 BC (Bachat Gat)"]
+            payment_mode = st.selectbox("Payment Mode", payment_options)
+            
+            # Category selection for non-BC
+            category = None
+            if ttype != "Income" and nature != "Income":
+                category = st.selectbox("Category", all_cats)
+            else:
+                category = "Salary" if ttype == "Income" else "General"
+                st.text(f"Category: {category} (auto-set)")
+        
+        # Display nature
         st.text(f"Nature: {nature} (auto-assigned by AI)")
         
-        category = None
-        if ttype != "Income" and nature != "Income":
-            category = st.selectbox("Category", all_cats)
-        else:
-            category = "Salary" if ttype == "Income" else "General"
-            st.text(f"Category: {category} (auto-set)")
-        
-        # Payment Mode - add BC account as option
-        payment_options = ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash", "💳 BC (Bachat Gat)"]
-        payment_mode = st.selectbox("Payment Mode", payment_options)
+        # For BC, we already set category above, but if not, show it
+        if not is_bc_type(ttype):
+            pass  # already set
     
     # Transfer fields
     from_acc = None
@@ -855,7 +864,7 @@ elif st.session_state.page == "➕ Add":
                     idx = acc_idx[0]
                     if nature == "Income":
                         st.session_state.accounts.loc[idx, 'Balance'] += amount
-                    elif nature in ["Expense", "BC"] or is_bc_type(ttype):
+                    elif nature in ["Expense", "BC"]:
                         st.session_state.accounts.loc[idx, 'Balance'] -= amount
                     update_worksheet('Accounts', st.session_state.accounts)
 
@@ -995,23 +1004,26 @@ elif st.session_state.page == "➕ Add":
                     acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                     if not acc_idx.empty:
                         idx_acc = acc_idx[0]
-                        rev_nature = ai_detect_nature(tx.get('Description',''), category, amount, ttype)
-                        if not rev_nature:
-                            default_nature_map = {
-                                "Income": "Income",
-                                "Expense": "Expense",
-                                "Investment": "Expense",
-                                "Transfer": "Neutral",
-                                "BC": "Expense"
-                            }
-                            custom_nature = None
-                            if ttype in st.session_state.custom_types['TypeName'].values:
-                                custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
-                            rev_nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                        
+                        # Reverse nature
                         if is_bc_type(ttype):
-                            rev_nature = "Expense"
+                            rev_nature = "Income"  # BC is income, so reverse it (minus)
+                        else:
+                            rev_nature = ai_detect_nature(tx.get('Description',''), category, amount, ttype)
+                            if not rev_nature:
+                                default_nature_map = {
+                                    "Income": "Income",
+                                    "Expense": "Expense",
+                                    "Investment": "Expense",
+                                    "Transfer": "Neutral"
+                                }
+                                custom_nature = None
+                                if ttype in st.session_state.custom_types['TypeName'].values:
+                                    custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+                                rev_nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                        
                         if rev_nature == "Income":
-                            st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount
+                            st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount  # reverse the plus
                         elif rev_nature in ["Expense", "BC"]:
                             st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
                         update_worksheet('Accounts', st.session_state.accounts)
@@ -1443,7 +1455,7 @@ elif st.session_state.page == "⚡ More":
                     fig5.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
                     st.plotly_chart(fig5, use_container_width=True)
             
-            # BC Report (now using account balance, not transactions)
+            # BC Report - now from account balance
             bc_bal = st.session_state.accounts.loc[st.session_state.accounts['Account']=='💳 BC (Bachat Gat)', 'Balance'].values[0] if not st.session_state.accounts.empty else 0
             st.info(f"💳 BC (Bachat Gat) Total Balance: {format_currency(bc_bal)}")
         else:
@@ -1608,21 +1620,24 @@ elif st.session_state.page == "⚡ More":
                             acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                             if not acc_idx.empty:
                                 idx_acc = acc_idx[0]
-                                rev_nature = ai_detect_nature(tx.get('Description',''), category, amount, ttype)
-                                if not rev_nature:
-                                    default_nature_map = {
-                                        "Income": "Income",
-                                        "Expense": "Expense",
-                                        "Investment": "Expense",
-                                        "Transfer": "Neutral",
-                                        "BC": "Expense"
-                                    }
-                                    custom_nature = None
-                                    if ttype in st.session_state.custom_types['TypeName'].values:
-                                        custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
-                                    rev_nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                                
+                                # Reverse nature for BC as Income
                                 if is_bc_type(ttype):
-                                    rev_nature = "Expense"
+                                    rev_nature = "Income"
+                                else:
+                                    rev_nature = ai_detect_nature(tx.get('Description',''), category, amount, ttype)
+                                    if not rev_nature:
+                                        default_nature_map = {
+                                            "Income": "Income",
+                                            "Expense": "Expense",
+                                            "Investment": "Expense",
+                                            "Transfer": "Neutral"
+                                        }
+                                        custom_nature = None
+                                        if ttype in st.session_state.custom_types['TypeName'].values:
+                                            custom_nature = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == ttype]['Nature'].values[0]
+                                        rev_nature = custom_nature if custom_nature else default_nature_map.get(ttype, "Income")
+                                
                                 if rev_nature == "Income":
                                     st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount
                                 elif rev_nature in ["Expense", "BC"]:
