@@ -23,7 +23,6 @@ CSS = f"""
         background: {BG_GRADIENT};
         min-height: 100vh;
     }}
-    /* Custom Header */
     .custom-header {{
         background: linear-gradient(90deg, #6366f1, #8b5cf6, #d946ef);
         -webkit-background-clip: text;
@@ -50,7 +49,6 @@ CSS = f"""
         font-size: 1.2rem;
         font-weight: 500;
     }}
-    /* Glassmorphism Cards */
     .sheet-card {{
         background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(12px);
@@ -83,7 +81,6 @@ CSS = f"""
         color: #94a3b8;
         margin-top: 4px;
     }}
-    /* EMI Progress Bar */
     .progress-bar {{
         width: 100%;
         height: 6px;
@@ -510,7 +507,7 @@ if st.session_state.page == "🏠 Home":
     savings = monthly_inc - monthly_exp
     total_budget_val = st.session_state.budget['Current Month Budget'].sum()
 
-    # ---------- INVESTMENT CARDS ----------
+    # Investment cards
     inv_df = st.session_state.investments
     total_invested = inv_df['Total Invested'].sum() if not inv_df.empty else 0
     total_current = inv_df['Current Value'].sum() if not inv_df.empty else 0
@@ -525,7 +522,7 @@ if st.session_state.page == "🏠 Home":
         sip_gold_inv = 0
         sip_gold_curr = 0
 
-    # ---------- EMI SUMMARY ----------
+    # EMI summary
     emi_df = st.session_state.emi
     active_loans = emi_df[emi_df['Status'] == 'Active'] if not emi_df.empty else pd.DataFrame()
     total_emi_remaining = active_loans['Remaining Due'].sum() if not active_loans.empty else 0
@@ -617,7 +614,7 @@ if st.session_state.page == "🏠 Home":
         </div>
         """, unsafe_allow_html=True)
 
-    # Row 4: EMI Card (Detailed)
+    # Row 4: EMI Summary
     st.markdown("### 🏦 Loan / EMI Summary")
     if not active_loans.empty:
         col_emi1, col_emi2, col_emi3 = st.columns(3)
@@ -650,7 +647,7 @@ if st.session_state.page == "🏠 Home":
             </div>
             """, unsafe_allow_html=True)
 
-        # List active loans with details
+        # Active loans details
         st.markdown("#### 📋 Active Loan Details")
         for idx, row in active_loans.iterrows():
             loan_progress = ((row['Installments Paid'] / row['Tenure (Months)']) * 100) if row['Tenure (Months)'] > 0 else 0
@@ -763,18 +760,17 @@ elif st.session_state.page == "➕ Add":
                 category = st.selectbox("Category", inv_cats)
                 payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
 
-                # ---------- UNITS INPUT FOR GOLD / SIP ----------
+                # Units input for Gold/SIP
                 units_input = None
                 if category in ["Gold", "SIP"]:
                     st.markdown("#### 📊 Units (Optional)")
                     units_input = st.number_input(f"Units for {category} (leave 0 for auto-calc)", min_value=0.0, step=0.001, format="%.4f", value=0.0)
-                    # If units_input is 0, we'll auto-calculate later if price available
                     if units_input > 0:
                         st.info(f"✅ {units_input:.4f} units will be added to this investment.")
                     else:
                         st.info("💡 Units will be auto-calculated from amount/price if price available.")
                 else:
-                    units_input = 0.0  # not used
+                    units_input = 0.0
 
                 if category == "BC":
                     st.info("💡 BC (Bachat Gat) → Your savings will increase (tracked separately)")
@@ -794,7 +790,7 @@ elif st.session_state.page == "➕ Add":
         if from_acc == to_acc:
             st.warning("⚠️ From and To accounts must be different.")
 
-    # EMI fields (for Expense with EMI category)
+    # EMI fields (Expense with EMI category)
     is_emi = (ttype == "Expense") and (category and 'emi' in category.lower())
     emi_loan = None
     if is_emi:
@@ -809,7 +805,7 @@ elif st.session_state.page == "➕ Add":
         else:
             st.info("No EMI loans added yet. Go to More > EMI to add a loan.")
 
-    # Investment Name (for non-BC investments)
+    # Investment Name (non-BC)
     inv_name = None
     if ttype == "Investment" and category != "BC":
         st.markdown("---")
@@ -908,15 +904,12 @@ elif st.session_state.page == "➕ Add":
 
                 # ----- INVESTMENT (with Units) -----
                 if ttype == "Investment" and category != "BC" and inv_name and amount > 0:
-                    # Compute units if not manually provided
                     units_to_add = units_input if units_input and units_input > 0 else 0.0
                     if units_to_add == 0.0:
-                        # Auto-calculate from price
                         price_per_unit = None
                         if category == "Gold":
                             price_per_unit = get_gold_price_inr_per_gram()
                         elif category == "SIP":
-                            # Try Axis Gold Fund NAV if name contains Axis/Gold Fund
                             if inv_name and ('Axis' in inv_name or 'Gold Fund' in inv_name):
                                 price_per_unit = get_axis_gold_fund_nav()
                         if price_per_unit and price_per_unit > 0:
@@ -1043,7 +1036,6 @@ elif st.session_state.page == "➕ Add":
                             st.session_state.investments.loc[idx_inv, 'Total Invested'] -= amount
                             if 'Current Value' in st.session_state.investments.columns:
                                 st.session_state.investments.loc[idx_inv, 'Current Value'] -= amount
-                            # We don't reverse units automatically (user can adjust)
                             update_worksheet('Investments', st.session_state.investments)
 
                 # Reverse Fuel
@@ -1334,6 +1326,76 @@ elif st.session_state.page == "⚡ More":
     with tabs[0]:
         st.markdown("#### 💼 Your Investments")
 
+        # Quick Update Portfolio (new)
+        with st.expander("⚡ Quick Update Portfolio"):
+            st.markdown("##### 📊 Enter your current units")
+            st.caption("Update Gold and Axis Gold Fund units to reflect your portfolio.")
+
+            col_q1, col_q2 = st.columns(2)
+            with col_q1:
+                gold_units = st.number_input("Gold Units (grams)", value=0.087535, step=0.001, format="%.6f")
+            with col_q2:
+                axis_units = st.number_input("Axis Gold Fund Units", value=2.932, step=0.001, format="%.3f")
+
+            if st.button("✅ Update Portfolio", key="quick_update_portfolio"):
+                updated = False
+
+                # Gold
+                gold_name = "PhonePe Gold"
+                if gold_name in st.session_state.investments['Name'].values:
+                    idx = st.session_state.investments[st.session_state.investments['Name'] == gold_name].index[0]
+                    st.session_state.investments.loc[idx, 'Units'] = gold_units
+                else:
+                    new_inv = pd.DataFrame({
+                        'Name': [gold_name],
+                        'Type': ['Gold'],
+                        'Amount': [0],
+                        'Frequency': ['Daily'],
+                        'Total Invested': [0],
+                        'Current Value': [0],
+                        'Units': [gold_units]
+                    })
+                    st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
+                updated = True
+
+                # Axis Gold Fund
+                axis_name = "Axis Gold Fund (SIP)"
+                if axis_name in st.session_state.investments['Name'].values:
+                    idx = st.session_state.investments[st.session_state.investments['Name'] == axis_name].index[0]
+                    st.session_state.investments.loc[idx, 'Units'] = axis_units
+                else:
+                    new_inv = pd.DataFrame({
+                        'Name': [axis_name],
+                        'Type': ['MF'],
+                        'Amount': [0],
+                        'Frequency': ['Daily'],
+                        'Total Invested': [0],
+                        'Current Value': [0],
+                        'Units': [axis_units]
+                    })
+                    st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
+                updated = True
+
+                if updated:
+                    # Fetch current values
+                    for idx, row in st.session_state.investments.iterrows():
+                        name = row['Name']
+                        if 'Gold' in name:
+                            price = get_gold_price_inr_per_gram()
+                            if price and row['Units'] > 0:
+                                st.session_state.investments.loc[idx, 'Current Value'] = row['Units'] * price
+                        elif 'Axis Gold Fund' in name:
+                            nav = get_axis_gold_fund_nav()
+                            if nav and row['Units'] > 0:
+                                st.session_state.investments.loc[idx, 'Current Value'] = row['Units'] * nav
+
+                    update_worksheet('Investments', st.session_state.investments)
+                    st.cache_data.clear()
+                    st.success("✅ Portfolio updated with live values!")
+                    st.rerun()
+                else:
+                    st.warning("No changes made.")
+
         # Auto-update current values
         if st.button("🔄 Update Current Values (Gold & SIP)"):
             updated = False
@@ -1373,7 +1435,6 @@ elif st.session_state.page == "⚡ More":
                     if st.button("Update Units"):
                         idx = inv_row.index[0]
                         st.session_state.investments.loc[idx, 'Units'] = new_units
-                        # Recalculate current value if Gold/SIP
                         name = inv_row.iloc[0]['Name']
                         if 'Gold' in name:
                             price = get_gold_price_inr_per_gram()
@@ -1394,6 +1455,7 @@ elif st.session_state.page == "⚡ More":
             else:
                 st.info("No investments to edit.")
 
+        # Add Investment
         with st.expander("➕ Add Investment (Manual)"):
             inv_name = st.text_input("Investment Name")
             inv_type = st.selectbox("Type", ["SIP", "Gold", "MF", "Stock", "Other"])
@@ -1409,6 +1471,8 @@ elif st.session_state.page == "⚡ More":
                 st.cache_data.clear()
                 st.success("Investment Saved!")
                 st.rerun()
+
+        # Delete Investment
         if not st.session_state.investments.empty:
             inv_del = st.selectbox("Select Investment to Delete", st.session_state.investments['Name'])
             if st.button("🗑️ Delete Selected Investment"):
