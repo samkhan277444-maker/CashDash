@@ -14,30 +14,6 @@ from google.oauth2.service_account import Credentials
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="CashDash - Riyaz Pathan", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- PIN LOCK (SECURITY) ----------
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    st.markdown("""
-    <style>
-        .pin-container { text-align: center; margin-top: 100px; }
-        .pin-box { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); padding: 50px; border-radius: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); display: inline-block; border: 1px solid rgba(255,255,255,0.5); color: #1e293b; }
-        .stTextInput input { background: rgba(255,255,255,0.8); border: 1px solid #cbd5e1; color: #1e293b; border-radius: 12px; }
-    </style>
-    <div class="pin-container"><div class="pin-box">
-    <h2 style="margin-bottom:20px; background: linear-gradient(90deg, #4f46e5, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🔒 Enter PIN</h2>
-    """, unsafe_allow_html=True)
-    pin_input = st.text_input("", type="password", placeholder="Enter 4-digit PIN", key="pin_input")
-    if st.button("Unlock App"):
-        if pin_input == "1234":  # Change to your PIN
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("❌ Wrong PIN!")
-    st.markdown("</div></div>", unsafe_allow_html=True)
-    st.stop()
-
 # ---------- LIGHT GREEN & BLUE THEME + BIGGER TABS (ADVANCED CSS) ----------
 CSS = f"""
 <style>
@@ -47,7 +23,6 @@ CSS = f"""
         min-height: 100vh;
     }}
     
-    /* Animated Gradient Shine for Header */
     @keyframes shine {{
         0% {{ background-position: -200% center; }}
         100% {{ background-position: 200% center; }}
@@ -76,11 +51,9 @@ CSS = f"""
     }}
     .greeting-text {{ color: #1e293b; font-size: 1.2rem; font-weight: 500; }}
     
-    /* Premium Glass Cards with Glowing Effects */
     .card {{
         background: rgba(255, 255, 255, 0.6);
         backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
         border-radius: 24px;
         padding: 20px 24px;
         margin-bottom: 16px;
@@ -90,7 +63,6 @@ CSS = f"""
         position: relative;
         overflow: hidden;
     }}
-    /* Glowing neon border animation */
     .card::before {{
         content: '';
         position: absolute;
@@ -103,9 +75,7 @@ CSS = f"""
         opacity: 0;
         transition: opacity 0.4s;
     }}
-    .card:hover::before {{
-        opacity: 1;
-    }}
+    .card:hover::before {{ opacity: 1; }}
     .card:hover {{
         transform: translateY(-8px) scale(1.02);
         box-shadow: 0 16px 64px rgba(79, 70, 229, 0.15);
@@ -120,7 +90,6 @@ CSS = f"""
     .card-value {{ font-size: 1.8rem; font-weight: 800; color: #0f172a; }}
     .card-sub {{ font-size: 0.65rem; color: #64748b; margin-top: 4px; }}
 
-    /* Glowing Progress Bars */
     .progress-bar {{
         width: 100%; height: 6px; background: rgba(255,255,255,0.5); border-radius: 10px; margin: 8px 0; overflow: hidden;
     }}
@@ -130,7 +99,6 @@ CSS = f"""
         box-shadow: 0 0 15px rgba(236, 72, 153, 0.4);
     }}
 
-    /* Futuristic Buttons */
     .stButton button {{
         width: 100%; border-radius: 30px; font-weight: 700; border: none;
         background: linear-gradient(90deg, #4f46e5, #ec4899);
@@ -145,7 +113,6 @@ CSS = f"""
         background: linear-gradient(90deg, #ec4899, #4f46e5);
     }}
 
-    /* BIGGER TABS FOR MORE, BANK, ADD */
     .stTabs [data-baseweb="tab-list"] button {{
         font-size: 1.1rem !important;
         font-weight: 600 !important;
@@ -168,22 +135,9 @@ CSS = f"""
         border-bottom: 3px solid #4f46e5 !important;
     }}
 
-    /* Glass Dataframes */
-    .stDataFrame {{
-        background: rgba(255, 255, 255, 0.5);
-        backdrop-filter: blur(8px);
-        border-radius: 16px;
-        padding: 10px;
-        border: 1px solid rgba(255,255,255,0.8);
-        color: #1e293b !important;
-    }}
-    /* Alerts & Info */
-    .stAlert {{
-        background: rgba(255, 255, 255, 0.8) !important;
-        color: #1e293b !important;
-        border: 1px solid rgba(255,255,255,0.9) !important;
-    }}
-    /* Hide default Streamlit footer */
+    .stDataFrame {{ background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(8px); border-radius: 16px; padding: 10px; border: 1px solid rgba(255,255,255,0.8); color: #1e293b !important; }}
+    .stAlert {{ background: rgba(255, 255, 255, 0.8) !important; color: #1e293b !important; border: 1px solid rgba(255,255,255,0.9) !important; }}
+    
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
     footer:after {{
@@ -196,7 +150,6 @@ CSS = f"""
         padding: 20px 0;
     }}
     
-    /* Responsive fixes */
     @media (max-width: 768px) {{
         .card {{ padding: 12px 16px; }}
         .card-value {{ font-size: 1.2rem; }}
@@ -248,7 +201,6 @@ def get_gsheet_client():
         st.error(f"❌ Connection Error: {e}")
         return None
 
-# ---------- CACHED DATA LOAD ----------
 @st.cache_data(ttl=60)
 def load_all_sheets():
     gc = get_gsheet_client()
@@ -324,7 +276,6 @@ def update_settings(key, value):
     except Exception as e:
         st.warning(f"Could not update settings: {e}")
 
-# ---------- AI SUBSCRIPTION DETECTIVE ----------
 def detect_subscription_anomalies():
     df = st.session_state.transactions
     if df.empty: return []
@@ -347,7 +298,6 @@ def detect_subscription_anomalies():
                     alerts.append(f"⚠️ AI Detective: {desc} charges changed from ₹{prices[0]:.0f} to ₹{prices[-1]:.0f}.")
     return alerts
 
-# ---------- CLEANUP AUTO ENTRIES ----------
 def cleanup_auto_entries():
     if 'auto_entries_cleaned' in st.session_state: return
     if 'transactions' not in st.session_state or st.session_state.transactions.empty:
@@ -363,23 +313,18 @@ def cleanup_auto_entries():
         update_worksheet('Transactions', st.session_state.transactions)
     st.session_state.auto_entries_cleaned = True
 
-# ---------- SESSION STATE ----------
 def init_session_state():
     all_data = load_all_sheets()
-
-    # Transactions
     loaded = all_data.get('Transactions', pd.DataFrame())
     required_cols = ['Date','Description','Category','Amount','Type','Payment Mode','Status','Receipt_Image','Split_With']
     if loaded.empty or not all(c in loaded.columns for c in ['Date','Description','Category','Amount','Type','Payment Mode','Status']):
         st.session_state.transactions = pd.DataFrame(columns=required_cols)
     else:
         for col in required_cols:
-            if col not in loaded.columns:
-                loaded[col] = None
+            if col not in loaded.columns: loaded[col] = None
         st.session_state.transactions = loaded
     cleanup_auto_entries()
 
-    # Budget
     loaded = all_data.get('Budget', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Category','Current Month Budget','Previous Month Budget','Actual This Month']):
         st.session_state.budget = pd.DataFrame({
@@ -388,10 +333,8 @@ def init_session_state():
             'Previous Month Budget': [3200,2500,2000,1000,1572,1000,1000,500,1500,500,1000],
             'Actual This Month': [3200,2500,2000,1000,0,1200,500,0,0,800,0]
         })
-    else:
-        st.session_state.budget = loaded
+    else: st.session_state.budget = loaded
 
-    # Accounts
     loaded = all_data.get('Accounts', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Account','Balance']):
         st.session_state.accounts = pd.DataFrame({
@@ -404,41 +347,32 @@ def init_session_state():
             loaded = pd.concat([loaded, new_row], ignore_index=True)
         st.session_state.accounts = loaded
 
-    # Investments (removed Current Value and Units)
     loaded = all_data.get('Investments', pd.DataFrame())
     if not loaded.empty and 'Name' in loaded.columns:
         loaded = loaded[loaded['Name'].notna() & (loaded['Name'].astype(str).str.strip() != '')]
     req_inv_cols = ['Name','Type','Amount','Frequency','Total Invested']
     if loaded.empty or not all(c in loaded.columns for c in req_inv_cols):
         st.session_state.investments = pd.DataFrame(columns=req_inv_cols)
-    else:
-        st.session_state.investments = loaded
+    else: st.session_state.investments = loaded
 
-    # EMI
     loaded = all_data.get('EmiManager', pd.DataFrame())
     required_emi_cols = ['Lender','Total Loan','EMI Amount','Tenure (Months)','Interest Charged',
                          'Net Disbursed','Total Due','Remaining Due','Next Due Date','Frequency',
                          'Installment Day','Schedule','Installments Paid','Status']
     if loaded.empty or not all(c in loaded.columns for c in required_emi_cols):
         st.session_state.emi = pd.DataFrame(columns=required_emi_cols)
-    else:
-        st.session_state.emi = loaded
+    else: st.session_state.emi = loaded
 
-    # Goals
     loaded = all_data.get('Goals', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Goal Name','Target','Saved']):
         st.session_state.goals = pd.DataFrame(columns=['Goal Name', 'Target', 'Saved'])
-    else:
-        st.session_state.goals = loaded
+    else: st.session_state.goals = loaded
 
-    # Fuel
     loaded = all_data.get('FuelTracker', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Date','Distance (km)','Fuel (L)','Cost (₹)']):
         st.session_state.fuel = pd.DataFrame(columns=['Date', 'Distance (km)', 'Fuel (L)', 'Cost (₹)'])
-    else:
-        st.session_state.fuel = loaded
+    else: st.session_state.fuel = loaded
 
-    # Settings
     loaded = all_data.get('Settings', pd.DataFrame())
     if loaded.empty:
         st.session_state.master_budget = 0.0
@@ -452,51 +386,39 @@ def init_session_state():
             st.session_state.last_sync_time = loaded[loaded['Key']=='last_sync_time']['Value'].values[0]
         else: st.session_state.last_sync_time = "Never"
 
-    # Custom Types
     loaded = all_data.get('CustomTypes', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['TypeName','Nature']):
         st.session_state.custom_types = pd.DataFrame(columns=['TypeName','Nature'])
-    else:
-        st.session_state.custom_types = loaded
+    else: st.session_state.custom_types = loaded
 
-    # Custom Categories
     loaded = all_data.get('CustomCategories', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Category']):
         st.session_state.custom_categories = pd.DataFrame(columns=['Category'])
-    else:
-        st.session_state.custom_categories = loaded
+    else: st.session_state.custom_categories = loaded
 
-    # Custom Natures
     loaded = all_data.get('CustomNatures', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Nature']):
         st.session_state.custom_natures = pd.DataFrame({'Nature': ['Income', 'Expense']})
-    else:
-        st.session_state.custom_natures = loaded
+    else: st.session_state.custom_natures = loaded
 
-    # Liabilities (Keep)
     loaded = all_data.get('Liabilities', pd.DataFrame())
     if loaded.empty:
         st.session_state.liabilities = pd.DataFrame(columns=['Lender', 'Due Date', 'Total Due', 'Paid', 'Status'])
-    else:
-        st.session_state.liabilities = loaded
+    else: st.session_state.liabilities = loaded
 
-# FIX: Handle restart gracefully
 if 'initialized' not in st.session_state:
     init_session_state()
     st.session_state.initialized = True
 else:
-    # Force create existing session state variables if missing on restart
     if 'liabilities' not in st.session_state:
         st.session_state.liabilities = pd.DataFrame(columns=['Lender', 'Due Date', 'Total Due', 'Paid', 'Status'])
 
 if 'page' not in st.session_state:
     st.session_state.page = "🏠 Home"
 
-# ---------- HELPER FUNCTIONS ----------
 def format_currency(amount):
     return f"₹ {amount:,.0f}"
 
-# ---------- SYNC FUNCTION ----------
 def force_sync():
     try:
         update_worksheet('Transactions', st.session_state.transactions)
@@ -518,26 +440,20 @@ def force_sync():
     except Exception as e:
         return False, f"❌ Sync failed: {e}"
 
-# ---------- NAVIGATION ----------
 nav = st.radio("Menu", ["🏠 Home", "➕ Add", "🎯 Budget", "🏦 Bank", "⚡ More"], index=0, horizontal=True, key='nav_radio')
 st.session_state.page = nav
 
 # ===================== HOME =====================
 if st.session_state.page == "🏠 Home":
     st.markdown("## 📊 Dashboard")
-
     alerts = detect_subscription_anomalies()
-    for alert in alerts:
-        st.warning(alert)
+    for alert in alerts: st.warning(alert)
 
     current_month = datetime.now().strftime('%B')
     df_tx = st.session_state.transactions
-
-    # Account balances (FIXED for trailing spaces)
     accounts_df = st.session_state.accounts
     def get_balance(acc_name):
-        if accounts_df.empty:
-            return 0.0
+        if accounts_df.empty: return 0.0
         mask = accounts_df['Account'].astype(str).str.strip() == acc_name
         return accounts_df.loc[mask, 'Balance'].values[0] if mask.any() else 0.0
 
@@ -555,142 +471,48 @@ if st.session_state.page == "🏠 Home":
         monthly_inc = df_month[df_month['Type']=='Income']['Amount'].sum()
         monthly_exp = df_month[df_month['Type']=='Expense']['Amount'].sum()
     savings = monthly_inc - monthly_exp
-    total_budget_val = st.session_state.budget['Current Month Budget'].sum()
+    total_budget_val = float(st.session_state.budget['Current Month Budget'].sum())
 
-    # Investment cards (removed Current Value / Units)
     inv_df = st.session_state.investments
-    total_invested = inv_df['Total Invested'].sum() if not inv_df.empty else 0
-
+    total_invested = float(inv_df['Total Invested'].sum()) if not inv_df.empty else 0
     if not inv_df.empty and 'Name' in inv_df.columns:
-        sip_mask = inv_df['Name'].str.upper().str.contains('SIP', na=False)
-        gold_mask = inv_df['Name'].str.upper().str.contains('GOLD', na=False)
-        sip_gold_mask = sip_mask | gold_mask
+        sip_gold_mask = inv_df['Name'].str.upper().str.contains('SIP|GOLD', na=False)
         sip_gold_inv = inv_df.loc[sip_gold_mask, 'Total Invested'].sum() if sip_gold_mask.any() else 0
-    else:
-        sip_gold_inv = 0
+    else: sip_gold_inv = 0
 
-    # EMI summary
     emi_df = st.session_state.emi
     active_loans = emi_df[emi_df['Status'] == 'Active'] if not emi_df.empty else pd.DataFrame()
-    total_emi_remaining = active_loans['Remaining Due'].sum() if not active_loans.empty else 0
-    total_emi_monthly = active_loans['EMI Amount'].sum() if not active_loans.empty else 0
-    total_emi_tenure = active_loans['Tenure (Months)'].sum() if not active_loans.empty else 0
-    total_emi_paid = active_loans['Installments Paid'].sum() if not active_loans.empty else 0
+    total_emi_remaining = float(active_loans['Remaining Due'].sum()) if not active_loans.empty else 0
+    total_emi_monthly = float(active_loans['EMI Amount'].sum()) if not active_loans.empty else 0
+    total_emi_tenure = float(active_loans['Tenure (Months)'].sum()) if not active_loans.empty else 0
+    total_emi_paid = float(active_loans['Installments Paid'].sum()) if not active_loans.empty else 0
 
-    # ----- ROW 1: BANK ACCOUNTS (GLOWING CARDS) -----
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>🏦 BOB Bank</div>
-            <div class='card-value' style='color:#4f46e5;'>{format_currency(bob_bal)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>🏦 BOM Bank</div>
-            <div class='card-value' style='color:#7c3aed;'>{format_currency(bom_bal)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>📱 PhonePe Wallet</div>
-            <div class='card-value' style='color:#0891b2;'>{format_currency(upi_bal)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col4:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>💵 Cash</div>
-            <div class='card-value' style='color:#059669;'>{format_currency(cash_bal)}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with col1: st.markdown(f"<div class='card'><div class='card-header'>🏦 BOB Bank</div><div class='card-value' style='color:#4f46e5;'>{format_currency(bob_bal)}</div></div>", unsafe_allow_html=True)
+    with col2: st.markdown(f"<div class='card'><div class='card-header'>🏦 BOM Bank</div><div class='card-value' style='color:#7c3aed;'>{format_currency(bom_bal)}</div></div>", unsafe_allow_html=True)
+    with col3: st.markdown(f"<div class='card'><div class='card-header'>📱 PhonePe Wallet</div><div class='card-value' style='color:#0891b2;'>{format_currency(upi_bal)}</div></div>", unsafe_allow_html=True)
+    with col4: st.markdown(f"<div class='card'><div class='card-header'>💵 Cash</div><div class='card-value' style='color:#059669;'>{format_currency(cash_bal)}</div></div>", unsafe_allow_html=True)
 
-    # ----- ROW 2: INCOME, EXPENSE, BUDGET -----
     col5, col6, col7 = st.columns(3)
-    with col5:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>📈 Total Income</div>
-            <div class='card-value' style='color:#059669;'>{format_currency(monthly_inc)}</div>
-            <div class='card-sub'>This Month</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col6:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>📉 Total Expense</div>
-            <div class='card-value' style='color:#dc2626;'>{format_currency(monthly_exp)}</div>
-            <div class='card-sub'>This Month</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col7:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>🎯 This Month Budget</div>
-            <div class='card-value' style='color:#d97706;'>{format_currency(total_budget_val)}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with col5: st.markdown(f"<div class='card'><div class='card-header'>📈 Total Income</div><div class='card-value' style='color:#059669;'>{format_currency(monthly_inc)}</div><div class='card-sub'>This Month</div></div>", unsafe_allow_html=True)
+    with col6: st.markdown(f"<div class='card'><div class='card-header'>📉 Total Expense</div><div class='card-value' style='color:#dc2626;'>{format_currency(monthly_exp)}</div><div class='card-sub'>This Month</div></div>", unsafe_allow_html=True)
+    with col7: st.markdown(f"<div class='card'><div class='card-header'>🎯 This Month Budget</div><div class='card-value' style='color:#d97706;'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
 
-    # ----- ROW 3: INVESTMENT CARDS (Removed current value) -----
     col_inv1, col_inv2, col_inv3 = st.columns(3)
-    with col_inv1:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>📈 Total Investment</div>
-            <div class='card-value' style='color:#7c3aed;'>{format_currency(total_invested)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_inv2:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>🥇 Gold + SIP</div>
-            <div class='card-value' style='color:#d97706;'>{format_currency(sip_gold_inv)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_inv3:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>💳 BC (Bachat Gat)</div>
-            <div class='card-value' style='color:#db2777;'>{format_currency(bc_bal)}</div>
-            <div class='card-sub'>Your Savings Pool</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with col_inv1: st.markdown(f"<div class='card'><div class='card-header'>📈 Total Investment</div><div class='card-value' style='color:#7c3aed;'>{format_currency(total_invested)}</div></div>", unsafe_allow_html=True)
+    with col_inv2: st.markdown(f"<div class='card'><div class='card-header'>🥇 Gold + SIP</div><div class='card-value' style='color:#d97706;'>{format_currency(sip_gold_inv)}</div></div>", unsafe_allow_html=True)
+    with col_inv3: st.markdown(f"<div class='card'><div class='card-header'>💳 BC (Bachat Gat)</div><div class='card-value' style='color:#db2777;'>{format_currency(bc_bal)}</div><div class='card-sub'>Your Savings Pool</div></div>", unsafe_allow_html=True)
 
-    # ----- ROW 4: EMI SUMMARY -----
     st.markdown("### 🏦 Loan / EMI Summary")
     if not active_loans.empty:
         col_emi1, col_emi2, col_emi3 = st.columns(3)
-        with col_emi1:
-            st.markdown(f"""
-            <div class='card'>
-                <div class='card-header'>📊 Total Remaining</div>
-                <div class='card-value' style='color:#dc2626;'>{format_currency(total_emi_remaining)}</div>
-                <div class='card-sub'>Across {len(active_loans)} active loans</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with col_emi2:
-            st.markdown(f"""
-            <div class='card'>
-                <div class='card-header'>📆 Monthly EMI</div>
-                <div class='card-value' style='color:#4f46e5;'>{format_currency(total_emi_monthly)}</div>
-                <div class='card-sub'>Due on {active_loans.iloc[0]['Installment Day']}th of month</div>
-            </div>
-            """, unsafe_allow_html=True)
+        with col_emi1: st.markdown(f"<div class='card'><div class='card-header'>📊 Total Remaining</div><div class='card-value' style='color:#dc2626;'>{format_currency(total_emi_remaining)}</div><div class='card-sub'>Across {len(active_loans)} active loans</div></div>", unsafe_allow_html=True)
+        with col_emi2: st.markdown(f"<div class='card'><div class='card-header'>📆 Monthly EMI</div><div class='card-value' style='color:#4f46e5;'>{format_currency(total_emi_monthly)}</div><div class='card-sub'>Due on {active_loans.iloc[0]['Installment Day']}th of month</div></div>", unsafe_allow_html=True)
         with col_emi3:
             progress = (total_emi_paid / (total_emi_paid + (total_emi_tenure - total_emi_paid))) * 100 if total_emi_tenure > 0 else 0
-            st.markdown(f"""
-            <div class='card'>
-                <div class='card-header'>📈 Progress</div>
-                <div class='card-value' style='color:#059669;'>{progress:.1f}%</div>
-                <div class='progress-bar'><div class='progress-fill' style='width: {min(progress,100)}%;'></div></div>
-                <div class='card-sub'>{total_emi_paid} / {total_emi_tenure} installments paid</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"<div class='card'><div class='card-header'>📈 Progress</div><div class='card-value' style='color:#059669;'>{progress:.1f}%</div><div class='progress-bar'><div class='progress-fill' style='width: {min(progress,100)}%;'></div></div><div class='card-sub'>{total_emi_paid:.0f} / {total_emi_tenure:.0f} installments paid</div></div>", unsafe_allow_html=True)
 
-        for idx, row in active_loans.iterrows():
+        for _, row in active_loans.iterrows():
             loan_progress = ((row['Installments Paid'] / row['Tenure (Months)']) * 100) if row['Tenure (Months)'] > 0 else 0
             st.markdown(f"""
             <div style='background: rgba(255,255,255,0.6); backdrop-filter: blur(8px); border-radius: 16px; padding: 12px 16px; margin-bottom: 8px; border-left: 4px solid #4f46e5; color: #1e293b;'>
@@ -703,34 +525,24 @@ if st.session_state.page == "🏠 Home":
                 <div class='progress-bar' style='margin-top: 4px;'><div class='progress-fill' style='width: {min(loan_progress,100)}%;'></div></div>
             </div>
             """, unsafe_allow_html=True)
-    else:
-        st.info("No active loans. Add a loan in ⚡ More → EMI Manager.")
+    else: st.info("No active loans. Add a loan in ⚡ More → EMI Manager.")
 
-    # ----- ROW 5: NO-SPEND DAY TRACKER + STREAK -----
     st.markdown("### 🏆 No-Spend Day Tracker")
     today = datetime.now().date()
     first_day = today.replace(day=1)
-    if today.month == 12:
-        last_day = today.replace(day=31)
-    else:
-        last_day = (first_day + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-    
+    if today.month == 12: last_day = today.replace(day=31)
+    else: last_day = (first_day + timedelta(days=32)).replace(day=1) - timedelta(days=1)
     spend_map = {d.strftime('%Y-%m-%d'): 0 for d in pd.date_range(first_day, last_day)}
     if not df_tx.empty:
         df_tx_cpy = df_tx.copy()
         df_tx_cpy['Date'] = pd.to_datetime(df_tx_cpy['Date']).dt.date
         expenses = df_tx_cpy[(df_tx_cpy['Type'] == 'Expense') & (df_tx_cpy['Date'] >= first_day) & (df_tx_cpy['Date'] <= last_day)]
         for date_str in expenses['Date'].astype(str):
-            if date_str in spend_map:
-                spend_map[date_str] = 1
-    
+            if date_str in spend_map: spend_map[date_str] = 1
     streak = 0
     for d in sorted(spend_map.keys(), reverse=True):
-        if spend_map[d] == 0:
-            streak += 1
-        else:
-            break
-    
+        if spend_map[d] == 0: streak += 1
+        else: break
     st.markdown(f"<div style='margin-bottom:10px; color:#d97706;'><strong>🔥 Current Streak: {streak} days</strong></div>", unsafe_allow_html=True)
     days = list(spend_map.keys())
     for i in range(0, len(days), 7):
@@ -739,15 +551,9 @@ if st.session_state.page == "🏠 Home":
             if i+j < len(days):
                 d_str = days[i+j]
                 color = "#059669" if spend_map[d_str] == 0 else "#dc2626"
-                date_obj = datetime.strptime(d_str, '%Y-%m-%d')
-                day_num = date_obj.day
-                cols[j].markdown(f"""
-                <div style='background:{color}; color:white; border-radius:12px; text-align:center; padding:8px 0; font-weight:700; font-size:1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
-                    {day_num}
-                </div>
-                """, unsafe_allow_html=True)
+                day_num = datetime.strptime(d_str, '%Y-%m-%d').day
+                cols[j].markdown(f"<div style='background:{color}; color:white; border-radius:12px; text-align:center; padding:8px 0; font-weight:700; font-size:1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>{day_num}</div>", unsafe_allow_html=True)
 
-    # ----- ROW 6: NET WORTH CHART -----
     st.markdown("### 📈 Net Worth Trend (This Month)")
     if not df_tx.empty:
         df_net = df_tx.copy()
@@ -756,10 +562,8 @@ if st.session_state.page == "🏠 Home":
         fig_net = px.line(daily_sum, x='Date', y='Amount', title='Daily Net Cash Flow', markers=True)
         fig_net.update_layout(plot_bgcolor='rgba(255,255,255,0.3)', paper_bgcolor='rgba(255,255,255,0)', font=dict(color='#1e293b'), margin=dict(l=0,r=0,t=20,b=0))
         st.plotly_chart(fig_net, use_container_width=True)
-    else:
-        st.info("No transactions yet to show Net Worth trend.")
+    else: st.info("No transactions yet to show Net Worth trend.")
 
-    # ----- ROW 7: SAVINGS MILESTONE (BALLOONS) -----
     total_net_worth = bob_bal + bom_bal + upi_bal + cash_bal + bc_bal + total_invested
     milestones = [10000, 25000, 50000, 100000, 250000, 500000]
     for m in milestones:
@@ -768,37 +572,24 @@ if st.session_state.page == "🏠 Home":
             st.balloons()
             st.success(f"🎉 Congratulations! Your Net Worth crossed ₹{m:,}!")
 
-    # ----- ROW 8: AI INSIGHTS -----
     st.markdown("### 🤖 AI Insights")
     col_ai1, col_ai2 = st.columns(2)
     with col_ai1:
         if not df_tx.empty:
             top_exp = df_month[df_month['Type']=='Expense'].groupby('Category')['Amount'].sum().sort_values(ascending=False).head(1)
-            if not top_exp.empty:
-                top_cat = top_exp.index[0]
-                top_amt = top_exp.values[0]
-                st.info(f"📊 Your top spending category this month is **{top_cat}** (₹{top_amt:.0f}).")
-            else:
-                st.info("No expenses yet.")
-        else:
-            st.info("Add transactions to see insights.")
+            if not top_exp.empty: st.info(f"📊 Your top spending category this month is **{top_exp.index[0]}** (₹{top_exp.values[0]:.0f}).")
+            else: st.info("No expenses yet.")
+        else: st.info("Add transactions to see insights.")
     with col_ai2:
-        if monthly_inc > 0:
-            rate = (savings / monthly_inc) * 100
-            st.info(f"💎 Your savings rate this month is **{rate:.1f}%**.")
-        else:
-            st.info("No income recorded yet.")
+        if monthly_inc > 0: st.info(f"💎 Your savings rate this month is **{(savings/monthly_inc)*100:.1f}%**.")
+        else: st.info("No income recorded yet.")
 
-    # ----- ROW 9: RECENT TRANSACTIONS -----
     st.markdown("### 📋 Recent Transactions")
     recent = st.session_state.transactions.sort_values('Date', ascending=False).head(5)
     if not recent.empty:
-        display_cols = ['Date','Description','Category','Amount','Type']
-        st.dataframe(recent[display_cols].style.format({'Amount': '₹ {:.0f}'}).hide(axis=0), use_container_width=True)
-    else:
-        st.info("No transactions yet.")
+        st.dataframe(recent[['Date','Description','Category','Amount','Type']].style.format({'Amount': '₹ {:.0f}'}).hide(axis=0), use_container_width=True)
+    else: st.info("No transactions yet.")
 
-    # ----- ROW 10: SYNC -----
     st.markdown("---")
     col_sync1, col_sync2 = st.columns([3, 1])
     with col_sync1:
@@ -812,10 +603,8 @@ if st.session_state.page == "🏠 Home":
 # ===================== ADD TRANSACTION =====================
 elif st.session_state.page == "➕ Add":
     st.subheader("➕ Add Transaction")
-
     budget_cats = st.session_state.budget['Category'].tolist()
-    if 'BC' not in budget_cats:
-        budget_cats.append('BC')
+    if 'BC' not in budget_cats: budget_cats.append('BC')
 
     col1, col2 = st.columns(2)
     with col1:
@@ -823,54 +612,38 @@ elif st.session_state.page == "➕ Add":
         desc = st.text_input("Description")
         amount = st.number_input("Amount ₹", min_value=0.0)
     with col2:
-        # ----- TYPE DROPDOWN (Only 5 Types) -----
         ttype = st.selectbox("Type", ["Expense", "Income", "Transfer", "Investment", "Loan"])
-
-        # ----- LOAN SUB-TYPES (Loan Taken / Returned) -----
         loan_subtype = None
         nature = "Neutral"
-        
         if ttype == "Loan":
             loan_subtype = st.selectbox("Loan Action", ["Loan Taken", "Loan Returned"])
             payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
-            
             if loan_subtype == "Loan Taken":
                 nature = "Income"
                 category = "Loan Taken"
                 st.info("💡 Loan Taken → Income (balance will increase)")
-            else:  # Loan Returned
+            else:
                 nature = "Expense"
                 category = "Loan Returned"
                 st.info("💡 Loan Returned → Expense (balance will decrease)")
-
-        # ----- OTHER TYPES (Expense, Income, Transfer, Investment) -----
         else:
             category = st.selectbox("Category", budget_cats + ["Other", "Food", "Travel", "Mobile", "EMI", "Shopping", "Fuel", "Rent", "Education"])
             payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
-
-            # Auto-detect Nature based on Type
-            if ttype == "Income":
-                nature = "Income"
-            elif ttype in ["Expense", "Investment"]:
-                nature = "Expense"
+            if ttype == "Income": nature = "Income"
+            elif ttype in ["Expense", "Investment"]: nature = "Expense"
             elif ttype == "Transfer":
                 nature = "Neutral"
                 category = "Transfer"
-            
             st.markdown(f"**Nature:** `{nature}` (auto-detected)")
 
-    # ----- SPLIT EXPENSE -----
     split_with = None
     if ttype == "Expense":
         split_options = ["Self", "Friend", "Partner", "Family"]
         split_with = st.selectbox("Split Expense With", split_options)
-        if split_with != "Self":
-            st.info(f"💡 Expense will be split between Self and {split_with}. Main entry amount is full amount.")
+        if split_with != "Self": st.info(f"💡 Expense will be split between Self and {split_with}. Main entry amount is full amount.")
 
-    # ----- RECEIPT UPLOAD -----
     receipt_file = st.file_uploader("📎 Upload Receipt (Optional)", type=["png", "jpg", "jpeg"])
 
-    # ----- EMI FIELDS (Only for Expense+EMI) -----
     is_emi = (ttype == "Expense") and (category and 'emi' in category.lower())
     emi_loan = None
     if is_emi:
@@ -883,31 +656,24 @@ elif st.session_state.page == "➕ Add":
                 emi_row = st.session_state.emi[st.session_state.emi['Lender'] == emi_loan].iloc[0]
                 st.info(f"💡 Remaining: {format_currency(emi_row['Remaining Due'])}. After payment: {format_currency(emi_row['Remaining Due'] - amount)}")
 
-    # ----- INVESTMENT NAME (Non-BC) -----
     inv_name = None
     if ttype == "Investment" and category != "BC":
         inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
         inv_options = ['New Investment'] + inv_names
         inv_name = st.selectbox("Select Investment", inv_options)
-        if inv_name == 'New Investment':
-            inv_name = st.text_input("Enter new investment name")
+        if inv_name == 'New Investment': inv_name = st.text_input("Enter new investment name")
 
-    # ----- FUEL FIELDS -----
     is_fuel = (ttype == "Expense") and (category == 'Fuel' or (category and 'fuel' in category.lower()))
-    f_dist = None
-    f_litres = None
+    f_dist = None; f_litres = None
     if is_fuel:
         st.markdown("---")
         st.subheader("Fuel Details")
         f_dist = st.number_input("Distance (km)", min_value=0.0, step=1.0)
         f_litres = st.number_input("Fuel (L)", min_value=0.0, step=0.1)
         if not desc.strip():
-            if f_dist > 0:
-                desc = f"Fuel - {f_litres:.1f} L, {f_dist:.1f} km"
-            else:
-                desc = f"Fuel - {f_litres:.1f} L"
+            if f_dist > 0: desc = f"Fuel - {f_litres:.1f} L, {f_dist:.1f} km"
+            else: desc = f"Fuel - {f_litres:.1f} L"
 
-    # ----- SUBMIT BUTTON -----
     if st.button("✅ Add Transaction", key="submit_btn"):
         duplicate = False
         if not st.session_state.transactions.empty:
@@ -922,15 +688,11 @@ elif st.session_state.page == "➕ Add":
                         st.warning("⚠️ Duplicate transaction detected within last 10 minutes! Please confirm.")
                         break
         if not duplicate:
-            if amount <= 0:
-                st.error("❌ Amount must be greater than 0!")
+            if amount <= 0: st.error("❌ Amount must be greater than 0!")
             else:
                 try:
                     receipt_b64 = None
-                    if receipt_file:
-                        receipt_b64 = base64.b64encode(receipt_file.read()).decode('utf-8')
-
-                    # Apply Split Logic (if applicable)
+                    if receipt_file: receipt_b64 = base64.b64encode(receipt_file.read()).decode('utf-8')
                     actual_amount = amount
                     if split_with and split_with != "Self":
                         actual_amount = amount / 2
@@ -938,57 +700,36 @@ elif st.session_state.page == "➕ Add":
 
                     new_row = [date.strftime('%Y-%m-%d'), desc, category, actual_amount, ttype, payment_mode, '✅', receipt_b64, split_with if split_with else "Self"]
                     new_df = pd.DataFrame([{
-                        'Date': date.strftime('%Y-%m-%d'),
-                        'Description': desc,
-                        'Category': category,
-                        'Amount': actual_amount,
-                        'Type': ttype,
-                        'Payment Mode': payment_mode,
-                        'Status': '✅',
-                        'Receipt_Image': receipt_b64,
-                        'Split_With': split_with if split_with else "Self"
+                        'Date': date.strftime('%Y-%m-%d'), 'Description': desc, 'Category': category,
+                        'Amount': actual_amount, 'Type': ttype, 'Payment Mode': payment_mode, 'Status': '✅',
+                        'Receipt_Image': receipt_b64, 'Split_With': split_with if split_with else "Self"
                     }])
                     st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                     append_to_worksheet('Transactions', new_row)
 
-                    # ================= UPDATE BALANCES =================
-                    # 1. TRANSFER
-                    if ttype == "Transfer":
-                        pass  # Transfers handled separately in Bank tab
-
-                    # 2. BC INVESTMENT (Savings Pool)
+                    if ttype == "Transfer": pass
                     elif category == "BC" and ttype == "Investment":
                         bc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == '💳 BC (Bachat Gat)'].index[0]
                         st.session_state.accounts.loc[bc_idx, 'Balance'] += actual_amount
                         acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                         if not acc_idx.empty:
-                            idx = acc_idx[0]
-                            st.session_state.accounts.loc[idx, 'Balance'] -= actual_amount
+                            idx = acc_idx[0]; st.session_state.accounts.loc[idx, 'Balance'] -= actual_amount
                         update_worksheet('Accounts', st.session_state.accounts)
-
-                    # 3. LOAN TAKEN / LOAN RETURNED
                     elif ttype == "Loan":
                         acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                         if not acc_idx.empty:
                             idx = acc_idx[0]
-                            if loan_subtype == "Loan Taken":
-                                st.session_state.accounts.loc[idx, 'Balance'] += actual_amount
-                            else:  # Loan Returned
-                                st.session_state.accounts.loc[idx, 'Balance'] -= actual_amount
+                            if loan_subtype == "Loan Taken": st.session_state.accounts.loc[idx, 'Balance'] += actual_amount
+                            else: st.session_state.accounts.loc[idx, 'Balance'] -= actual_amount
                             update_worksheet('Accounts', st.session_state.accounts)
-
-                    # 4. NORMAL ACCOUNT UPDATE (Income, Expense, Investment)
                     else:
                         acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                         if not acc_idx.empty:
                             idx = acc_idx[0]
-                            if nature == "Income":
-                                st.session_state.accounts.loc[idx, 'Balance'] += actual_amount
-                            elif nature == "Expense":
-                                st.session_state.accounts.loc[idx, 'Balance'] -= actual_amount
+                            if nature == "Income": st.session_state.accounts.loc[idx, 'Balance'] += actual_amount
+                            elif nature == "Expense": st.session_state.accounts.loc[idx, 'Balance'] -= actual_amount
                             update_worksheet('Accounts', st.session_state.accounts)
 
-                    # ================= EMI UPDATE =================
                     if is_emi and ttype == "Expense" and emi_loan and actual_amount > 0:
                         emi_idx = st.session_state.emi[st.session_state.emi['Lender'] == emi_loan].index[0]
                         current_remaining = st.session_state.emi.loc[emi_idx, 'Remaining Due']
@@ -1000,48 +741,38 @@ elif st.session_state.page == "➕ Add":
                                 st.session_state.emi.loc[emi_idx, 'Installments Paid'] = st.session_state.emi.loc[emi_idx, 'Tenure (Months)']
                             update_worksheet('EmiManager', st.session_state.emi)
 
-                    # ================= INVESTMENT UPDATE (Non-BC) =================
                     if ttype == "Investment" and category != "BC" and inv_name and actual_amount > 0:
                         if inv_name in st.session_state.investments['Name'].values:
                             idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
                             st.session_state.investments.loc[idx_inv, 'Total Invested'] += actual_amount
                         else:
-                            new_inv = pd.DataFrame({
-                                'Name': [inv_name], 'Type': [category], 'Amount': [0],
-                                'Frequency': ['Monthly'], 'Total Invested': [actual_amount]
-                            })
+                            new_inv = pd.DataFrame({'Name': [inv_name], 'Type': [category], 'Amount': [0], 'Frequency': ['Monthly'], 'Total Invested': [actual_amount]})
                             st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
                         update_worksheet('Investments', st.session_state.investments)
 
-                    # ================= FUEL UPDATE =================
                     if is_fuel and ttype == "Expense" and f_dist is not None and f_litres is not None:
-                        fuel_row = [date.strftime('%Y-%m-%d'), f_dist, f_litres, actual_amount]
                         st.session_state.fuel = pd.concat([st.session_state.fuel, pd.DataFrame([{
                             'Date': date.strftime('%Y-%m-%d'), 'Distance (km)': f_dist, 'Fuel (L)': f_litres, 'Cost (₹)': actual_amount
                         }])], ignore_index=True)
                         update_worksheet('FuelTracker', st.session_state.fuel)
 
-                    # ================= BUDGET UPDATE =================
-                    # Add new category to budget if it doesn't exist (except Loan/BC/Transfer)
                     if category not in st.session_state.budget['Category'].values and category not in ['Transfer', 'Loan Taken', 'Loan Returned', 'BC']:
                         new_budget_row = pd.DataFrame({
                             'Category': [category], 'Current Month Budget': [0.0], 'Previous Month Budget': [0.0],
-                            'Actual This Month': [actual_amount if ttype in ['Expense', 'Investment'] else 0.0]
+                            'Actual This Month': [float(actual_amount) if ttype in ['Expense', 'Investment'] else 0.0]
                         })
                         st.session_state.budget = pd.concat([st.session_state.budget, new_budget_row], ignore_index=True)
                         update_worksheet('Budget', st.session_state.budget)
 
-                    # Update existing budget actuals (only for Expense/Investment excluding BC and Loan)
                     if ttype in ['Expense', 'Investment'] and category != 'BC' and category not in ['Loan Taken', 'Loan Returned']:
                         if category in st.session_state.budget['Category'].values:
                             cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
-                            st.session_state.budget.loc[cat_idx, 'Actual This Month'] += actual_amount
+                            st.session_state.budget.loc[cat_idx, 'Actual This Month'] += float(actual_amount)
                             update_worksheet('Budget', st.session_state.budget)
 
                     st.success("✅ Transaction Saved Successfully!")
                 except Exception as e:
                     st.error(f"❌ Error: {e}")
-
             st.session_state.page = "🏠 Home"
             st.cache_data.clear()
             st.rerun()
@@ -1049,70 +780,43 @@ elif st.session_state.page == "➕ Add":
 # ===================== BUDGET =====================
 elif st.session_state.page == "🎯 Budget":
     st.subheader("🎯 Budget Planner (Monthly)")
-
     df = st.session_state.budget
     master_budget = st.session_state.master_budget
 
-    total_budget_val = df['Current Month Budget'].sum()
-    total_spent_val = df['Actual This Month'].sum()
-    total_prev_val = df['Previous Month Budget'].sum()
+    total_budget_val = float(df['Current Month Budget'].sum())
+    total_spent_val = float(df['Actual This Month'].sum())
+    total_prev_val = float(df['Previous Month Budget'].sum())
 
-    effective_cap = master_budget if master_budget > 0 else total_budget_val
+    effective_cap = float(master_budget) if master_budget > 0 else total_budget_val
     remaining_val = effective_cap - total_spent_val
 
     st.markdown("### 📊 Monthly Overview")
     col_t1, col_t2, col_t3, col_t4 = st.columns(4)
-    with col_t1:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>💰 Category Budget</div>
-            <div class='card-value' style='color:#4f46e5;'>{format_currency(total_budget_val)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_t2:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>🎯 Master Cap</div>
-            <div class='card-value' style='color:#7c3aed;'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_t3:
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>📉 Total Spent</div>
-            <div class='card-value' style='color:#dc2626;'>{format_currency(total_spent_val)}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with col_t1: st.markdown(f"<div class='card'><div class='card-header'>💰 Category Budget</div><div class='card-value' style='color:#4f46e5;'>{format_currency(total_budget_val)}</div></div>", unsafe_allow_html=True)
+    with col_t2: st.markdown(f"<div class='card'><div class='card-header'>🎯 Master Cap</div><div class='card-value' style='color:#7c3aed;'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div></div>", unsafe_allow_html=True)
+    with col_t3: st.markdown(f"<div class='card'><div class='card-header'>📉 Total Spent</div><div class='card-value' style='color:#dc2626;'>{format_currency(total_spent_val)}</div></div>", unsafe_allow_html=True)
     with col_t4:
         status_color = "#059669" if remaining_val >= 0 else "#dc2626"
         status_text = "✅ On Track" if remaining_val >= 0 else "⚠️ Over Budget"
-        st.markdown(f"""
-        <div class='card'>
-            <div class='card-header'>✅ Remaining</div>
-            <div class='card-value' style='color:{status_color};'>{format_currency(remaining_val)}</div>
-            <div class='card-sub'>{status_text}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='card'><div class='card-header'>✅ Remaining</div><div class='card-value' style='color:{status_color};'>{format_currency(remaining_val)}</div><div class='card-sub'>{status_text}</div></div>", unsafe_allow_html=True)
 
     st.markdown("### 🚨 Budget Alerts")
     alert_count = 0
     for _, row in df.iterrows():
-        if row['Current Month Budget'] > 0:
-            pct = (row['Actual This Month'] / row['Current Month Budget']) * 100
+        if float(row['Current Month Budget']) > 0:
+            pct = (float(row['Actual This Month']) / float(row['Current Month Budget'])) * 100
             if pct >= 100:
                 st.error(f"⚠️ **{row['Category']}** has exceeded budget! (Spent: {format_currency(row['Actual This Month'])} / Budget: {format_currency(row['Current Month Budget'])})")
                 alert_count += 1
             elif pct >= 80:
                 st.warning(f"⚠️ **{row['Category']}** is nearing budget! ({pct:.1f}% used)")
                 alert_count += 1
-    if alert_count == 0:
-        st.success("✅ All categories are within budget limits!")
+    if alert_count == 0: st.success("✅ All categories are within budget limits!")
 
 # ===================== BANK =====================
 elif st.session_state.page == "🏦 Bank":
     st.subheader("🏦 My Accounts")
     st.dataframe(st.session_state.accounts.style.format({'Balance': '₹ {:.0f}'}), use_container_width=True, hide_index=True)
-
     st.markdown("---")
     st.markdown("### 💰 Quick Actions")
     with st.expander("➕ Add Money"):
@@ -1125,19 +829,13 @@ elif st.session_state.page == "🏦 Bank":
                 idx = st.session_state.accounts.loc[mask].index[0]
                 st.session_state.accounts.loc[idx, 'Balance'] += amt_add
                 new_row = [datetime.now().strftime('%Y-%m-%d'), desc_add, "Deposit", amt_add, "Income", acc_add, '✅']
-                new_df = pd.DataFrame([{
-                    'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_add, 'Category': "Deposit",
-                    'Amount': amt_add, 'Type': "Income", 'Payment Mode': acc_add, 'Status': '✅'
-                }])
+                new_df = pd.DataFrame([{'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_add, 'Category': "Deposit", 'Amount': amt_add, 'Type': "Income", 'Payment Mode': acc_add, 'Status': '✅'}])
                 st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                 append_to_worksheet('Transactions', new_row)
                 update_worksheet('Accounts', st.session_state.accounts)
                 st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
-                st.session_state.page = "🏠 Home"
-                st.cache_data.clear()
-                st.rerun()
-            else:
-                st.error("Amount must be greater than 0.")
+                st.session_state.page = "🏠 Home"; st.cache_data.clear(); st.rerun()
+            else: st.error("Amount must be greater than 0.")
 
     with st.expander("➖ Withdraw Money"):
         acc_with = st.selectbox("Select Account", st.session_state.accounts['Account'], key='with_acc')
@@ -1151,21 +849,14 @@ elif st.session_state.page == "🏦 Bank":
                 if current_bal >= amt_with:
                     st.session_state.accounts.loc[idx, 'Balance'] -= amt_with
                     new_row = [datetime.now().strftime('%Y-%m-%d'), desc_with, "Withdrawal", amt_with, "Expense", acc_with, '✅']
-                    new_df = pd.DataFrame([{
-                        'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_with, 'Category': "Withdrawal",
-                        'Amount': amt_with, 'Type': "Expense", 'Payment Mode': acc_with, 'Status': '✅'
-                    }])
+                    new_df = pd.DataFrame([{'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_with, 'Category': "Withdrawal", 'Amount': amt_with, 'Type': "Expense", 'Payment Mode': acc_with, 'Status': '✅'}])
                     st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                     append_to_worksheet('Transactions', new_row)
                     update_worksheet('Accounts', st.session_state.accounts)
                     st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
-                    st.session_state.page = "🏠 Home"
-                    st.cache_data.clear()
-                    st.rerun()
-                else:
-                    st.error("❌ Insufficient balance!")
-            else:
-                st.error("Amount must be greater than 0.")
+                    st.session_state.page = "🏠 Home"; st.cache_data.clear(); st.rerun()
+                else: st.error("❌ Insufficient balance!")
+            else: st.error("Amount must be greater than 0.")
 
     with st.expander("🔄 Transfer"):
         from_acc = st.selectbox("From Account", st.session_state.accounts['Account'], key='trans_from')
@@ -1174,8 +865,7 @@ elif st.session_state.page == "🏦 Bank":
         desc_trans = st.text_input("Description (optional)", value="Internal Transfer", key='trans_desc')
         if st.button("Transfer", key="transfer_btn"):
             if amt_trans > 0:
-                if from_acc == to_acc:
-                    st.error("From and To accounts must be different.")
+                if from_acc == to_acc: st.error("From and To accounts must be different.")
                 else:
                     mask_from = st.session_state.accounts['Account'].astype(str).str.strip() == from_acc
                     mask_to = st.session_state.accounts['Account'].astype(str).str.strip() == to_acc
@@ -1186,40 +876,35 @@ elif st.session_state.page == "🏦 Bank":
                         st.session_state.accounts.loc[from_idx, 'Balance'] -= amt_trans
                         st.session_state.accounts.loc[to_idx, 'Balance'] += amt_trans
                         new_row = [datetime.now().strftime('%Y-%m-%d'), f"{desc_trans} (From {from_acc} to {to_acc})", "Transfer", amt_trans, "Transfer", f"{from_acc} -> {to_acc}", '✅']
-                        new_df = pd.DataFrame([{
-                            'Date': datetime.now().strftime('%Y-%m-%d'),
-                            'Description': f"{desc_trans} (From {from_acc} to {to_acc})",
-                            'Category': "Transfer",
-                            'Amount': amt_trans,
-                            'Type': "Transfer",
-                            'Payment Mode': f"{from_acc} -> {to_acc}",
-                            'Status': '✅'
-                        }])
+                        new_df = pd.DataFrame([{'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': f"{desc_trans} (From {from_acc} to {to_acc})", 'Category': "Transfer", 'Amount': amt_trans, 'Type': "Transfer", 'Payment Mode': f"{from_acc} -> {to_acc}", 'Status': '✅'}])
                         st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                         append_to_worksheet('Transactions', new_row)
                         update_worksheet('Accounts', st.session_state.accounts)
                         st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
-                        st.session_state.page = "🏠 Home"
-                        st.cache_data.clear()
-                        st.rerun()
-                    else:
-                        st.error("❌ Insufficient balance in source account!")
-            else:
-                st.error("Amount must be greater than 0.")
+                        st.session_state.page = "🏠 Home"; st.cache_data.clear(); st.rerun()
+                    else: st.error("❌ Insufficient balance in source account!")
+            else: st.error("Amount must be greater than 0.")
+
+    # ===================== RESET BALANCE OPTION =====================
+    st.markdown("---")
+    with st.expander("⚠️ Reset All Account Balances to Zero"):
+        st.error("This will set all bank, wallet, cash, and BC balances to ₹0. This action cannot be undone.")
+        if st.button("✅ Yes, Reset All Balances to ₹0", key="reset_balances_btn"):
+            st.session_state.accounts['Balance'] = 0.0
+            update_worksheet('Accounts', st.session_state.accounts)
+            st.cache_data.clear()
+            st.success("✅ All account balances reset to ₹0!")
+            st.session_state.page = "🏠 Home"
+            st.rerun()
 
 # ===================== MORE =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-    
-    # ONLY THESE TABS REMAIN
     tabs = st.tabs(["📈 Investments", "🏦 EMI Manager", "🎯 Goals", "📊 Reports", "💳 Liabilities", "⚙️ Customization", "📋 All Transactions"])
 
-    # --- INVESTMENTS (Removed Current Value & Units completely) ---
     with tabs[0]:
         st.markdown("#### 💼 Your Investments")
-        display_df = st.session_state.investments
-        st.dataframe(display_df, hide_index=True, use_container_width=True)
-
+        st.dataframe(st.session_state.investments, hide_index=True, use_container_width=True)
         with st.expander("➕ Add Investment (Manual)"):
             inv_name = st.text_input("Investment Name")
             inv_type = st.selectbox("Type", ["SIP", "Gold", "MF", "Stock", "Other"])
@@ -1229,22 +914,14 @@ elif st.session_state.page == "⚡ More":
             if st.button("Save Investment"):
                 new_inv = pd.DataFrame({'Name':[inv_name], 'Type':[inv_type], 'Amount':[amt], 'Frequency':[freq], 'Total Invested':[invested]})
                 st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
-                update_worksheet('Investments', st.session_state.investments)
-                st.cache_data.clear()
-                st.success("Investment Saved!")
-                st.rerun()
-
+                update_worksheet('Investments', st.session_state.investments); st.cache_data.clear(); st.success("Investment Saved!"); st.rerun()
         if not st.session_state.investments.empty:
             inv_del = st.selectbox("Select Investment to Delete", st.session_state.investments['Name'])
             if st.button("🗑️ Delete Selected Investment"):
                 idx = st.session_state.investments[st.session_state.investments['Name'] == inv_del].index[0]
                 st.session_state.investments = st.session_state.investments.drop(idx).reset_index(drop=True)
-                update_worksheet('Investments', st.session_state.investments)
-                st.cache_data.clear()
-                st.success("Investment Deleted!")
-                st.rerun()
+                update_worksheet('Investments', st.session_state.investments); st.cache_data.clear(); st.success("Investment Deleted!"); st.rerun()
 
-    # --- EMI MANAGER ---
     with tabs[1]:
         st.markdown("### 🏦 Loan EMI Manager")
         st.dataframe(st.session_state.emi, use_container_width=True, hide_index=True)
@@ -1255,57 +932,80 @@ elif st.session_state.page == "⚡ More":
                 extra = st.number_input("Extra Amount to Pay (₹)", min_value=0.0, step=100.0)
                 if st.button("Calculate Savings"):
                     if extra > 0:
-                        remaining = row['Remaining Due']
-                        emi = row['EMI Amount']
+                        remaining = row['Remaining Due']; emi = row['EMI Amount']
                         monthly_rate = (row['Interest Charged'] / row['Total Loan']) / row['Tenure (Months)'] if row['Total Loan'] > 0 else 0
                         new_tenure = -np.log(1 - (remaining * monthly_rate) / (emi + extra)) / np.log(1 + monthly_rate) if monthly_rate > 0 else 0
-                        st.info(f"💡 If you pay ₹{extra:.0f} extra now, you will save interest and finish the loan in approx {new_tenure:.1f} months (vs {row['Tenure (Months)'] - row['Installments Paid']} months left).")
-                    else:
-                        st.warning("Enter an extra amount to calculate.")
-            else:
-                st.info("Add a loan first.")
+                        st.info(f"💡 If you pay ₹{extra:.0f} extra now, you will save interest and finish the loan in approx {new_tenure:.1f} months.")
+                    else: st.warning("Enter an extra amount to calculate.")
+            else: st.info("Add a loan first.")
 
-    # --- GOALS ---
+        # ===================== FIX DUPLICATE EMI (EMERGENCY BUTTON) =====================
+        with st.expander("🔧 Fix Duplicate EMI (Emergency)"):
+            st.warning("If you added an extra EMI payment by mistake and it's not showing in All Transactions, use this button to remove the latest duplicate EMI and fix your loan balance.")
+            if st.button("✅ Remove Latest EMI Duplicate"):
+                try:
+                    df = st.session_state.transactions
+                    mask = (df['Type'] == 'Expense') & (df['Category'].astype(str).str.upper().str.contains('EMI', na=False)) & (df['Amount'] == 746)
+                    if not mask.any():
+                        mask = (df['Type'] == 'Expense') & (df['Description'].astype(str).str.upper().str.contains('EMI', na=False)) & (df['Amount'] == 746)
+                    if not mask.any():
+                        st.error("No duplicate EMI transaction found with Amount ₹746.")
+                    else:
+                        latest_idx = df[mask].sort_values('Date', ascending=False).index[0]
+                        tx = df.loc[latest_idx]
+                        amount = tx['Amount']
+                        payment_mode = tx['Payment Mode']
+                        
+                        emi_row = st.session_state.emi[st.session_state.emi['Lender'].str.contains('Northern Arc|Krazybee', na=False)]
+                        if not emi_row.empty:
+                            emi_idx = emi_row.index[0]
+                            st.session_state.emi.loc[emi_idx, 'Remaining Due'] += float(amount)
+                            st.session_state.emi.loc[emi_idx, 'Installments Paid'] -= 1
+                            if st.session_state.emi.loc[emi_idx, 'Installments Paid'] < 1:
+                                st.session_state.emi.loc[emi_idx, 'Installments Paid'] = 1
+                            update_worksheet('EmiManager', st.session_state.emi)
+                        
+                        acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
+                        if not acc_idx.empty:
+                            idx = acc_idx[0]
+                            st.session_state.accounts.loc[idx, 'Balance'] += float(amount)
+                            update_worksheet('Accounts', st.session_state.accounts)
+                        
+                        st.session_state.transactions = st.session_state.transactions.drop(latest_idx).reset_index(drop=True)
+                        update_worksheet('Transactions', st.session_state.transactions)
+                        
+                        st.success(f"✅ Successfully removed the duplicate EMI transaction of ₹{amount:.0f} from {payment_mode}. Loan balance has been corrected.")
+                        st.cache_data.clear(); st.rerun()
+                except Exception as e:
+                    st.error(f"Error fixing duplicate: {e}")
+
     with tabs[2]:
         st.dataframe(st.session_state.goals, hide_index=True, use_container_width=True)
         with st.form("add_goal"):
-            g_name = st.text_input("Goal Name")
-            g_target = st.number_input("Target ₹", min_value=1)
-            g_saved = st.number_input("Saved ₹", min_value=0)
+            g_name = st.text_input("Goal Name"); g_target = st.number_input("Target ₹", min_value=1); g_saved = st.number_input("Saved ₹", min_value=0)
             if st.form_submit_button("Add Goal"):
                 new_goal = pd.DataFrame({'Goal Name':[g_name], 'Target':[g_target], 'Saved':[g_saved]})
                 st.session_state.goals = pd.concat([st.session_state.goals, new_goal], ignore_index=True)
-                update_worksheet('Goals', st.session_state.goals)
-                st.cache_data.clear()
-                st.success("Goal Added!")
-                st.rerun()
+                update_worksheet('Goals', st.session_state.goals); st.cache_data.clear(); st.success("Goal Added!"); st.rerun()
         if not st.session_state.goals.empty:
             g_del = st.selectbox("Select Goal to Delete", st.session_state.goals['Goal Name'])
             if st.button("🗑️ Delete Selected Goal"):
                 idx = st.session_state.goals[st.session_state.goals['Goal Name'] == g_del].index[0]
                 st.session_state.goals = st.session_state.goals.drop(idx).reset_index(drop=True)
-                update_worksheet('Goals', st.session_state.goals)
-                st.cache_data.clear()
-                st.success("Goal Deleted!")
-                st.rerun()
+                update_worksheet('Goals', st.session_state.goals); st.cache_data.clear(); st.success("Goal Deleted!"); st.rerun()
 
-    # --- REPORTS ---
     with tabs[3]:
         st.markdown("### 📊 Advanced Reports")
         df = st.session_state.transactions
         if not df.empty:
-            df['Date'] = pd.to_datetime(df['Date'])
-            df['Month'] = df['Date'].dt.month_name()
-            
+            df['Date'] = pd.to_datetime(df['Date']); df['Month'] = df['Date'].dt.month_name()
             st.markdown("#### 🗓️ Spending Heatmap")
             df_heat = df[df['Type']=='Expense'].copy()
             if not df_heat.empty:
-                df_heat['Day'] = df_heat['Date'].dt.day_name()
-                df_heat['Week'] = df_heat['Date'].dt.isocalendar().week
+                df_heat['Day'] = df_heat['Date'].dt.day_name(); df_heat['Week'] = df_heat['Date'].dt.isocalendar().week
                 fig_heat = px.density_heatmap(df_heat, x='Day', y='Week', z='Amount', title='Spending Heatmap')
                 fig_heat.update_layout(plot_bgcolor='rgba(255,255,255,0.3)', paper_bgcolor='rgba(255,255,255,0)', font=dict(color='#1e293b'))
                 st.plotly_chart(fig_heat, use_container_width=True)
-
             st.markdown("#### 🔀 Income to Expense Flow")
             inc_df = df[df['Type']=='Income'].groupby('Category')['Amount'].sum().reset_index()
             exp_df = df[df['Type']=='Expense'].groupby('Category')['Amount'].sum().reset_index()
@@ -1315,96 +1015,65 @@ elif st.session_state.page == "⚡ More":
                 source = [node_indices[n] for n in inc_df['Category']]
                 target = [node_indices[n] for n in exp_df['Category']]
                 st.plotly_chart(go.Figure(data=[go.Sankey(
-                    node=dict(pad=15, thickness=20, line=dict(color="black", width=0.5),
-                              label=nodes, color="blue"),
+                    node=dict(pad=15, thickness=20, line=dict(color="black", width=0.5), label=nodes, color="blue"),
                     link=dict(source=source, target=target, value=inc_df['Amount'].tolist())
                 )]), use_container_width=True)
-        else:
-            st.info("No transactions available for reports.")
+        else: st.info("No transactions available for reports.")
 
-    # --- LIABILITIES ---
     with tabs[4]:
         st.markdown("#### 💳 Liabilities (Credit Cards / Dues)")
-        if 'liabilities' in st.session_state:
-            st.dataframe(st.session_state.liabilities, hide_index=True, use_container_width=True)
-        else:
-            st.info("Liabilities data is initializing...")
+        st.dataframe(st.session_state.liabilities, hide_index=True, use_container_width=True)
         with st.form("add_liability"):
             c1, c2 = st.columns(2)
             with c1:
-                lender = st.text_input("Lender / Card Name")
-                due = st.date_input("Due Date", datetime.now())
+                lender = st.text_input("Lender / Card Name"); due = st.date_input("Due Date", datetime.now())
             with c2:
-                total_due = st.number_input("Total Due ₹", min_value=0.0)
-                paid = st.number_input("Paid ₹", min_value=0.0)
+                total_due = st.number_input("Total Due ₹", min_value=0.0); paid = st.number_input("Paid ₹", min_value=0.0)
             if st.form_submit_button("Add Liability"):
                 new = pd.DataFrame([{'Lender': lender, 'Due Date': due.strftime('%Y-%m-%d'), 'Total Due': total_due, 'Paid': paid, 'Status': 'Pending' if total_due>paid else 'Cleared'}])
                 st.session_state.liabilities = pd.concat([st.session_state.liabilities, new], ignore_index=True)
-                update_worksheet('Liabilities', st.session_state.liabilities)
-                st.cache_data.clear()
-                st.success("Liability added!")
-                st.rerun()
+                update_worksheet('Liabilities', st.session_state.liabilities); st.cache_data.clear(); st.success("Liability added!"); st.rerun()
 
-    # --- CUSTOMIZATION ---
     with tabs[5]:
         st.markdown("#### ⚙️ Custom Types, Categories & Natures")
+        
         col_t1, col_t2 = st.columns(2)
         with col_t1:
             st.markdown("#### 📌 Custom Types")
-            if not st.session_state.custom_types.empty:
-                st.dataframe(st.session_state.custom_types, hide_index=True, use_container_width=True)
-            else:
-                st.info("No custom types added yet.")
+            st.dataframe(st.session_state.custom_types, hide_index=True, use_container_width=True)
             with st.form("add_custom_type"):
-                type_name = st.text_input("Type Name")
-                type_nature = st.selectbox("Nature", st.session_state.custom_natures['Nature'].tolist())
+                type_name = st.text_input("Type Name"); type_nature = st.selectbox("Nature", st.session_state.custom_natures['Nature'].tolist())
                 if st.form_submit_button("Add Type"):
                     if type_name:
                         new_type = pd.DataFrame({'TypeName':[type_name], 'Nature':[type_nature]})
                         st.session_state.custom_types = pd.concat([st.session_state.custom_types, new_type], ignore_index=True)
-                        update_worksheet('CustomTypes', st.session_state.custom_types)
-                        st.cache_data.clear()
-                        st.success(f"Type '{type_name}' added!")
-                        st.rerun()
+                        update_worksheet('CustomTypes', st.session_state.custom_types); st.cache_data.clear(); st.success(f"Type '{type_name}' added!"); st.rerun()
             if not st.session_state.custom_types.empty:
                 type_to_del = st.selectbox("Delete a Custom Type", st.session_state.custom_types['TypeName'])
                 if st.button("🗑️ Delete Type"):
                     idx = st.session_state.custom_types[st.session_state.custom_types['TypeName'] == type_to_del].index[0]
                     st.session_state.custom_types = st.session_state.custom_types.drop(idx).reset_index(drop=True)
-                    update_worksheet('CustomTypes', st.session_state.custom_types)
-                    st.cache_data.clear()
-                    st.success(f"Type '{type_to_del}' deleted!")
-                    st.rerun()
+                    update_worksheet('CustomTypes', st.session_state.custom_types); st.cache_data.clear(); st.success(f"Type '{type_to_del}' deleted!"); st.rerun()
+
         with col_t2:
             st.markdown("#### 🏷️ Custom Categories")
-            if not st.session_state.custom_categories.empty:
-                st.dataframe(st.session_state.custom_categories, hide_index=True, use_container_width=True)
-            else:
-                st.info("No custom categories added yet.")
+            st.dataframe(st.session_state.custom_categories, hide_index=True, use_container_width=True)
             with st.form("add_custom_category"):
                 cat_name = st.text_input("Category Name")
                 if st.form_submit_button("Add Category"):
                     if cat_name:
                         new_cat = pd.DataFrame({'Category':[cat_name]})
                         st.session_state.custom_categories = pd.concat([st.session_state.custom_categories, new_cat], ignore_index=True)
-                        update_worksheet('CustomCategories', st.session_state.custom_categories)
-                        st.cache_data.clear()
-                        st.success(f"Category '{cat_name}' added!")
-                        st.rerun()
+                        update_worksheet('CustomCategories', st.session_state.custom_categories); st.cache_data.clear(); st.success(f"Category '{cat_name}' added!"); st.rerun()
             if not st.session_state.custom_categories.empty:
                 cat_to_del = st.selectbox("Delete a Custom Category", st.session_state.custom_categories['Category'])
                 if st.button("🗑️ Delete Category"):
                     idx = st.session_state.custom_categories[st.session_state.custom_categories['Category'] == cat_to_del].index[0]
                     st.session_state.custom_categories = st.session_state.custom_categories.drop(idx).reset_index(drop=True)
-                    update_worksheet('CustomCategories', st.session_state.custom_categories)
-                    st.cache_data.clear()
-                    st.success(f"Category '{cat_to_del}' deleted!")
-                    st.rerun()
+                    update_worksheet('CustomCategories', st.session_state.custom_categories); st.cache_data.clear(); st.success(f"Category '{cat_to_del}' deleted!"); st.rerun()
+
         st.markdown("#### 🌿 Custom Natures")
-        if not st.session_state.custom_natures.empty:
-            st.dataframe(st.session_state.custom_natures, hide_index=True, use_container_width=True)
-        else:
-            st.info("No custom natures added yet.")
+        st.dataframe(st.session_state.custom_natures, hide_index=True, use_container_width=True)
         with st.form("add_custom_nature"):
             nature_name = st.text_input("Nature Name")
             if st.form_submit_button("Add Nature"):
@@ -1414,10 +1083,7 @@ elif st.session_state.page == "⚡ More":
                     else:
                         new_nature = pd.DataFrame({'Nature':[nature_name]})
                         st.session_state.custom_natures = pd.concat([st.session_state.custom_natures, new_nature], ignore_index=True)
-                        update_worksheet('CustomNatures', st.session_state.custom_natures)
-                        st.cache_data.clear()
-                        st.success(f"Nature '{nature_name}' added!")
-                        st.rerun()
+                        update_worksheet('CustomNatures', st.session_state.custom_natures); st.cache_data.clear(); st.success(f"Nature '{nature_name}' added!"); st.rerun()
         if not st.session_state.custom_natures.empty:
             deletable_natures = st.session_state.custom_natures[~st.session_state.custom_natures['Nature'].isin(['Income', 'Expense'])]
             if not deletable_natures.empty:
@@ -1425,128 +1091,96 @@ elif st.session_state.page == "⚡ More":
                 if st.button("🗑️ Delete Nature"):
                     idx = st.session_state.custom_natures[st.session_state.custom_natures['Nature'] == nature_to_del].index[0]
                     st.session_state.custom_natures = st.session_state.custom_natures.drop(idx).reset_index(drop=True)
-                    update_worksheet('CustomNatures', st.session_state.custom_natures)
-                    st.cache_data.clear()
-                    st.success(f"Nature '{nature_to_del}' deleted!")
-                    st.rerun()
-            else:
-                st.info("Only custom natures can be deleted. 'Income' and 'Expense' are default.")
+                    update_worksheet('CustomNatures', st.session_state.custom_natures); st.cache_data.clear(); st.success(f"Nature '{nature_to_del}' deleted!"); st.rerun()
+            else: st.info("Only custom natures can be deleted. 'Income' and 'Expense' are default.")
+
+        # ===================== DELETE CATEGORY FROM ADD TRANSACTION =====================
+        st.markdown("---")
+        st.markdown("#### 🗑️ Delete Categories (From Add Transaction Dropdown)")
+        if not st.session_state.budget.empty:
+            del_cat = st.selectbox("Select category to remove from Add Transaction dropdown", st.session_state.budget['Category'])
+            if st.button("🗑️ Delete Selected Category"):
+                idx = st.session_state.budget[st.session_state.budget['Category'] == del_cat].index[0]
+                st.session_state.budget = st.session_state.budget.drop(idx).reset_index(drop=True)
+                update_worksheet('Budget', st.session_state.budget)
+                st.cache_data.clear()
+                st.success(f"Category '{del_cat}' deleted from dropdown!")
+                st.rerun()
+        else: st.info("No categories to delete.")
 
     # --- ALL TRANSACTIONS (Row-wise UI with inline delete) ---
     with tabs[6]:
         st.markdown("### 📋 All Transactions")
-        
         if st.session_state.transactions.empty:
             st.info("No transactions yet.")
         else:
             df_sorted = st.session_state.transactions.sort_values('Date', ascending=False)
-            
             for i, (original_index, row) in enumerate(df_sorted.iterrows()):
-                
                 col_date, col_desc, col_amt, col_del = st.columns([2, 4, 2, 1])
-                
-                with col_date:
-                    st.write(f"**{row['Date']}**")
-                
-                with col_desc:
-                    st.write(f"{row['Description']} *({row['Category']})*")
-                
+                with col_date: st.write(f"**{row['Date']}**")
+                with col_desc: st.write(f"{row['Description']} *({row['Category']})*")
                 with col_amt:
-                    if row['Type'] == 'Income':
-                        st.markdown(f"<span style='color:#10b981; font-weight:600;'>₹ {row['Amount']:,.0f}</span>", unsafe_allow_html=True)
-                    elif row['Type'] == 'Expense':
-                        st.markdown(f"<span style='color:#ef4444; font-weight:600;'>- ₹ {row['Amount']:,.0f}</span>", unsafe_allow_html=True)
-                    else:
-                        st.write(f"₹ {row['Amount']:,.0f}")
-                
+                    if row['Type'] == 'Income': st.markdown(f"<span style='color:#10b981; font-weight:600;'>₹ {row['Amount']:,.0f}</span>", unsafe_allow_html=True)
+                    elif row['Type'] == 'Expense': st.markdown(f"<span style='color:#ef4444; font-weight:600;'>- ₹ {row['Amount']:,.0f}</span>", unsafe_allow_html=True)
+                    else: st.write(f"₹ {row['Amount']:,.0f}")
                 with col_del:
                     if st.button("❌", key=f"del_inline_{i}"):
-                        success_msg = None
-                        error_msg = None
                         try:
                             idx = original_index
                             tx = st.session_state.transactions.iloc[idx]
-                            
-                            ttype = tx['Type']
-                            category = tx['Category']
-                            amount = tx['Amount']
-                            payment_mode = tx['Payment Mode']
+                            ttype = tx['Type']; category = tx['Category']; amount = tx['Amount']; payment_mode = tx['Payment Mode']
 
-                            # Reverse budget
                             if ttype in ['Expense', 'Investment'] and category != 'BC':
                                 if category in st.session_state.budget['Category'].values:
                                     cat_idx = st.session_state.budget[st.session_state.budget['Category'] == category].index[0]
                                     st.session_state.budget.loc[cat_idx, 'Actual This Month'] -= amount
                                     update_worksheet('Budget', st.session_state.budget)
 
-                            # Reverse EMI
                             if ttype == 'Expense' and 'EMI' in category and not st.session_state.emi.empty:
                                 for loan in st.session_state.emi['Lender']:
                                     if loan in tx['Description'] or loan in category:
                                         emi_idx = st.session_state.emi[st.session_state.emi['Lender'] == loan].index[0]
                                         st.session_state.emi.loc[emi_idx, 'Remaining Due'] += amount
                                         st.session_state.emi.loc[emi_idx, 'Installments Paid'] -= 1
-                                        if st.session_state.emi.loc[emi_idx, 'Status'] == 'Cleared':
-                                            st.session_state.emi.loc[emi_idx, 'Status'] = 'Active'
+                                        if st.session_state.emi.loc[emi_idx, 'Status'] == 'Cleared': st.session_state.emi.loc[emi_idx, 'Status'] = 'Active'
                                         update_worksheet('EmiManager', st.session_state.emi)
                                         break
 
-                            # Reverse Investment (including BC)
                             if ttype == 'Investment':
                                 if category == 'BC':
                                     bc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == '💳 BC (Bachat Gat)'].index[0]
                                     st.session_state.accounts.loc[bc_idx, 'Balance'] -= amount
                                     acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                                     if not acc_idx.empty:
-                                        idx_acc = acc_idx[0]
-                                        st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
+                                        idx_acc = acc_idx[0]; st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
                                     update_worksheet('Accounts', st.session_state.accounts)
                                 else:
                                     inv_name = None
                                     for inv in st.session_state.investments['Name']:
-                                        if inv in tx['Description'] or inv in category:
-                                            inv_name = inv
-                                            break
+                                        if inv in tx['Description'] or inv in category: inv_name = inv; break
                                     if inv_name and inv_name in st.session_state.investments['Name'].values:
                                         idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
                                         st.session_state.investments.loc[idx_inv, 'Total Invested'] -= amount
                                         update_worksheet('Investments', st.session_state.investments)
 
-                            # Reverse Fuel
                             if ttype == 'Expense' and 'Fuel' in category:
-                                fuel_idx = st.session_state.fuel[
-                                    (st.session_state.fuel['Date'] == tx['Date']) &
-                                    (st.session_state.fuel['Cost (₹)'] == amount)
-                                ].index
+                                fuel_idx = st.session_state.fuel[(st.session_state.fuel['Date'] == tx['Date']) & (st.session_state.fuel['Cost (₹)'] == amount)].index
                                 if not fuel_idx.empty:
                                     st.session_state.fuel = st.session_state.fuel.drop(fuel_idx[0]).reset_index(drop=True)
                                     update_worksheet('FuelTracker', st.session_state.fuel)
 
-                            # Reverse account balance
                             if ttype != "Transfer" and not (ttype == 'Investment' and category == 'BC'):
                                 acc_idx = st.session_state.accounts[st.session_state.accounts['Account'] == payment_mode].index
                                 if not acc_idx.empty:
                                     idx_acc = acc_idx[0]
-                                    if ttype == "Income":
-                                        st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount
-                                    elif ttype in ["Expense", "Investment"]:
-                                        st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
+                                    if ttype == "Income": st.session_state.accounts.loc[idx_acc, 'Balance'] -= amount
+                                    elif ttype in ["Expense", "Investment"]: st.session_state.accounts.loc[idx_acc, 'Balance'] += amount
                                     update_worksheet('Accounts', st.session_state.accounts)
 
-                            # Finally, delete the transaction
                             st.session_state.transactions = st.session_state.transactions.drop(idx).reset_index(drop=True)
                             update_worksheet('Transactions', st.session_state.transactions)
-                            success_msg = "✅ Transaction Deleted successfully!"
+                            st.success("✅ Transaction Deleted successfully!")
+                            st.cache_data.clear(); st.rerun()
                         except Exception as e:
-                            error_msg = f"❌ Error: {e}"
-
-                        if success_msg:
-                            st.success(success_msg)
-                        if error_msg:
-                            st.error(error_msg)
-
-                        if success_msg:
-                            st.cache_data.clear()
-                            st.rerun()
-                
+                            st.error(f"❌ Error: {e}")
                 st.markdown("---")
