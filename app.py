@@ -325,17 +325,22 @@ def init_session_state():
         st.session_state.transactions = loaded
     cleanup_auto_entries()
 
-       loaded = all_data.get('Budget', pd.DataFrame())
+    loaded = all_data.get('Budget', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Category','Current Month Budget','Previous Month Budget','Actual This Month']):
-        # ... (default data logic same hai)
+        st.session_state.budget = pd.DataFrame({
+            'Category': ['Rent','Groceries','Vegetables','Mobile','EMI','Entertainment','Shopping','Education','Fuel','Investment','BC'],
+            'Current Month Budget': [3200,2500,2000,1000,1572,1000,1000,500,1500,500,1000],
+            'Previous Month Budget': [3200,2500,2000,1000,1572,1000,1000,500,1500,500,1000],
+            'Actual This Month': [3200,2500,2000,1000,0,1200,500,0,0,800,0]
+        })
     else:
-        # ✅ FIX: Force numeric conversion on load to prevent future errors
+        # ✅ FIX: Force numeric conversion on load to prevent future ValueError
         loaded['Current Month Budget'] = pd.to_numeric(loaded['Current Month Budget'], errors='coerce').fillna(0)
         loaded['Previous Month Budget'] = pd.to_numeric(loaded['Previous Month Budget'], errors='coerce').fillna(0)
         loaded['Actual This Month'] = pd.to_numeric(loaded['Actual This Month'], errors='coerce').fillna(0)
         st.session_state.budget = loaded
 
-loaded = all_data.get('Accounts', pd.DataFrame())
+    loaded = all_data.get('Accounts', pd.DataFrame())
     if loaded.empty or not all(c in loaded.columns for c in ['Account','Balance']):
         st.session_state.accounts = pd.DataFrame({
             'Account': ['BOB Bank', 'BOM Bank', 'PhonePe Wallet', 'Cash', '💳 BC (Bachat Gat)'],
@@ -815,6 +820,7 @@ elif st.session_state.page == "🎯 Budget":
                 st.warning(f"⚠️ **{row['Category']}** is nearing budget! ({pct:.1f}% used)")
                 alert_count += 1
     if alert_count == 0: st.success("✅ All categories are within budget limits!")
+
 # ===================== BANK =====================
 elif st.session_state.page == "🏦 Bank":
     st.subheader("🏦 My Accounts")
@@ -898,6 +904,49 @@ elif st.session_state.page == "🏦 Bank":
             st.success("✅ All account balances reset to ₹0!")
             st.session_state.page = "🏠 Home"
             st.rerun()
+
+# ===================== MORE =====================
+elif st.session_state.page == "⚡ More":
+    st.subheader("🚀 Premium Modules")
+    tabs = st.tabs(["📈 Investments", "🏦 EMI Manager", "🎯 Goals", "📊 Reports", "💳 Liabilities", "⚙️ Customization", "📋 All Transactions"])
+
+    with tabs[0]:
+        st.markdown("#### 💼 Your Investments")
+        st.dataframe(st.session_state.investments, hide_index=True, use_container_width=True)
+        with st.expander("➕ Add Investment (Manual)"):
+            inv_name = st.text_input("Investment Name")
+            inv_type = st.selectbox("Type", ["SIP", "Gold", "MF", "Stock", "Other"])
+            freq = st.selectbox("Frequency", ["Monthly", "Weekly"])
+            amt = st.number_input("Amount ₹", min_value=0.0)
+            invested = st.number_input("Total Invested So Far ₹", min_value=0.0)
+            if st.button("Save Investment"):
+                new_inv = pd.DataFrame({'Name':[inv_name], 'Type':[inv_type], 'Amount':[amt], 'Frequency':[freq], 'Total Invested':[invested]})
+                st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
+                update_worksheet('Investments', st.session_state.investments); st.cache_data.clear(); st.success("Investment Saved!"); st.rerun()
+        if not st.session_state.investments.empty:
+            inv_del = st.selectbox("Select Investment to Delete", st.session_state.investments['Name'])
+            if st.button("🗑️ Delete Selected Investment"):
+                idx = st.session_state.investments[st.session_state.investments['Name'] == inv_del].index[0]
+                st.session_state.investments = st.session_state.investments.drop(idx).reset_index(drop=True)
+                update_worksheet('Investments', st.session_state.investments); st.cache_data.clear(); st.success("Investment Deleted!"); st.rerun()
+
+    with tabs[1]:
+        st.markdown("### 🏦 Loan EMI Manager")
+        st.dataframe(st.session_state.emi, use_container_width=True, hide_index=True)
+        with st.expander("🧮 Loan Prepayment Calculator"):
+            if not st.session_state.emi.empty:
+                loan_sel = st.selectbox("Select Loan", st.session_state.emi['Lender'])
+                row = st.session_state.emi[st.session_state.emi['Lender'] == loan_sel].iloc[0]
+                extra = st.number_input("Extra Amount to Pay (₹)", min_value=0.0, step=100.0)
+                if st.button("Calculate Savings"):
+                    if extra > 0:
+                        remaining = row['Remaining Due']; emi = row['EMI Amount']
+                        monthly_rate = (row['Interest Charged'] / row['Total Loan']) / row['Tenure (Months)'] if row['Total Loan'] > 0 else 0
+                        new_tenure = -np.log(1 - (remaining * monthly_rate) / (emi + extra)) / np.log(1 + monthly_rate) if monthly_rate > 0 else 0
+                        st.info(f"💡 If you pay ₹{extra:.0f} extra now, you will save interest and finish the loan in approx {new_tenure:.1f} months.")
+                    else: st.warning("Enter an extra amount to calculate.")
+            else: st.info("Add a loan first.")
+
         # ===================== MANUAL EMI DELETION (NEW DROPDOWN) =====================
         with st.expander("🗑️ Manually Select & Delete an EMI Transaction"):
             st.warning("Select an EMI transaction from the list below to delete it. This will automatically fix the loan balance and account balance.")
@@ -969,6 +1018,47 @@ elif st.session_state.page == "🏦 Bank":
                     st.info("No EMI transactions found in your history.")
             else:
                 st.info("No transactions available.")
+
+    with tabs[2]:
+        st.dataframe(st.session_state.goals, hide_index=True, use_container_width=True)
+        with st.form("add_goal"):
+            g_name = st.text_input("Goal Name"); g_target = st.number_input("Target ₹", min_value=1); g_saved = st.number_input("Saved ₹", min_value=0)
+            if st.form_submit_button("Add Goal"):
+                new_goal = pd.DataFrame({'Goal Name':[g_name], 'Target':[g_target], 'Saved':[g_saved]})
+                st.session_state.goals = pd.concat([st.session_state.goals, new_goal], ignore_index=True)
+                update_worksheet('Goals', st.session_state.goals); st.cache_data.clear(); st.success("Goal Added!"); st.rerun()
+        if not st.session_state.goals.empty:
+            g_del = st.selectbox("Select Goal to Delete", st.session_state.goals['Goal Name'])
+            if st.button("🗑️ Delete Selected Goal"):
+                idx = st.session_state.goals[st.session_state.goals['Goal Name'] == g_del].index[0]
+                st.session_state.goals = st.session_state.goals.drop(idx).reset_index(drop=True)
+                update_worksheet('Goals', st.session_state.goals); st.cache_data.clear(); st.success("Goal Deleted!"); st.rerun()
+
+    with tabs[3]:
+        st.markdown("### 📊 Advanced Reports")
+        df = st.session_state.transactions
+        if not df.empty:
+            df['Date'] = pd.to_datetime(df['Date']); df['Month'] = df['Date'].dt.month_name()
+            st.markdown("#### 🗓️ Spending Heatmap")
+            df_heat = df[df['Type']=='Expense'].copy()
+            if not df_heat.empty:
+                df_heat['Day'] = df_heat['Date'].dt.day_name(); df_heat['Week'] = df_heat['Date'].dt.isocalendar().week
+                fig_heat = px.density_heatmap(df_heat, x='Day', y='Week', z='Amount', title='Spending Heatmap')
+                fig_heat.update_layout(plot_bgcolor='rgba(255,255,255,0.3)', paper_bgcolor='rgba(255,255,255,0)', font=dict(color='#1e293b'))
+                st.plotly_chart(fig_heat, use_container_width=True)
+            st.markdown("#### 🔀 Income to Expense Flow")
+            inc_df = df[df['Type']=='Income'].groupby('Category')['Amount'].sum().reset_index()
+            exp_df = df[df['Type']=='Expense'].groupby('Category')['Amount'].sum().reset_index()
+            if not inc_df.empty and not exp_df.empty:
+                nodes = list(inc_df['Category']) + list(exp_df['Category'])
+                node_indices = {name: i for i, name in enumerate(nodes)}
+                source = [node_indices[n] for n in inc_df['Category']]
+                target = [node_indices[n] for n in exp_df['Category']]
+                st.plotly_chart(go.Figure(data=[go.Sankey(
+                    node=dict(pad=15, thickness=20, line=dict(color="black", width=0.5), label=nodes, color="blue"),
+                    link=dict(source=source, target=target, value=inc_df['Amount'].tolist())
+                )]), use_container_width=True)
+        else: st.info("No transactions available for reports.")
 
     with tabs[4]:
         st.markdown("#### 💳 Liabilities (Credit Cards / Dues)")
