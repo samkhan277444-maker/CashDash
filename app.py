@@ -24,14 +24,15 @@ if not st.session_state.authenticated:
     st.markdown("""
     <style>
         .pin-container { text-align: center; margin-top: 100px; }
-        .pin-box { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); padding: 40px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); display: inline-block; }
+        .pin-box { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); padding: 50px; border-radius: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); display: inline-block; border: 1px solid rgba(255,255,255,0.1); color: white; }
+        .stTextInput input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 12px; }
     </style>
     <div class="pin-container"><div class="pin-box">
-    <h2 style="margin-bottom:20px;">🔒 Enter PIN</h2>
+    <h2 style="margin-bottom:20px; background: linear-gradient(90deg, #f472b6, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🔒 Enter PIN</h2>
     """, unsafe_allow_html=True)
     pin_input = st.text_input("", type="password", placeholder="Enter 4-digit PIN", key="pin_input")
     if st.button("Unlock App"):
-        if pin_input == "1234":  # Change this to your desired PIN
+        if pin_input == "1234":  # Change to your PIN
             st.session_state.authenticated = True
             st.rerun()
         else:
@@ -39,105 +40,136 @@ if not st.session_state.authenticated:
     st.markdown("</div></div>", unsafe_allow_html=True)
     st.stop()
 
-# ---------- LIGHT THEME & ADVANCED CSS (PREMIUM UI) ----------
-BG_GRADIENT = "linear-gradient(135deg, #e0e7ff 0%, #f0e6ff 50%, #fce4ec 100%)"
-
+# ---------- UNIQUE SPACE GLASS THEME (ADVANCED CSS) ----------
 CSS = f"""
 <style>
+    /* Dark Space Gradient Background */
     .stApp {{
-        background: {BG_GRADIENT};
+        background: radial-gradient(circle at 10% 20%, #0f172a 0%, #1e1b4b 50%, #2e1065 100%);
         min-height: 100vh;
     }}
-    @keyframes shimmer {{
+    
+    /* Animated Gradient Shine for Header */
+    @keyframes shine {{
         0% {{ background-position: -200% center; }}
         100% {{ background-position: 200% center; }}
     }}
     .custom-header {{
-        background: linear-gradient(90deg, #6366f1, #8b5cf6, #d946ef, #ec4899);
-        background-size: 200% auto;
+        background: linear-gradient(90deg, #f472b6, #a78bfa, #60a5fa, #f472b6);
+        background-size: 300% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 2.5rem;
-        font-weight: 800;
-        animation: shimmer 3s linear infinite;
+        font-size: 2.8rem;
+        font-weight: 900;
+        letter-spacing: -1px;
+        animation: shine 4s linear infinite;
         display: inline-block;
     }}
     .custom-badge {{
-        background: rgba(255, 255, 255, 0.6);
+        background: rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(4px);
         border-radius: 30px;
-        padding: 4px 16px;
+        padding: 6px 18px;
         font-size: 0.8rem;
-        color: #4f46e5;
-        border: 1px solid rgba(255, 255, 255, 0.4);
+        color: #a78bfa;
+        border: 1px solid rgba(255, 255, 255, 0.15);
         display: inline-block;
         margin-left: 12px;
     }}
-    .greeting-text {{ color: #1e293b; font-size: 1.2rem; font-weight: 500; }}
+    .greeting-text {{ color: #e2e8f0; font-size: 1.2rem; font-weight: 500; }}
     
-    /* Premium Glass Cards */
+    /* Premium Glass Cards with Glowing Effects */
     .card {{
-        background: rgba(255, 255, 255, 0.75);
+        background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
-        border-radius: 20px;
+        border-radius: 24px;
         padding: 20px 24px;
         margin-bottom: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        position: relative;
+        overflow: hidden;
+    }}
+    /* Glowing neon border animation */
+    .card::before {{
+        content: '';
+        position: absolute;
+        top: -2px; left: -2px; right: -2px; bottom: -2px;
+        background: linear-gradient(45deg, #4f46e5, #ec4899, #4f46e5);
+        background-size: 300% 300%;
+        border-radius: 24px;
+        z-index: -1;
+        animation: borderGlow 6s ease-in-out infinite;
+        opacity: 0;
+        transition: opacity 0.4s;
+    }}
+    .card:hover::before {{
+        opacity: 1;
     }}
     .card:hover {{
-        transform: translateY(-6px);
-        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 16px 64px rgba(79, 70, 229, 0.25);
     }}
-    .card-header {{ font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; }}
-    .card-value {{ font-size: 1.8rem; font-weight: 700; }}
-    .card-sub {{ font-size: 0.65rem; color: #94a3b8; margin-top: 4px; }}
+    @keyframes borderGlow {{
+        0% {{ background-position: 0% 50%; }}
+        50% {{ background-position: 100% 50%; }}
+        100% {{ background-position: 0% 50%; }}
+    }}
+    
+    .card-header {{ font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; }}
+    .card-value {{ font-size: 1.8rem; font-weight: 800; color: #f8fafc; }}
+    .card-sub {{ font-size: 0.65rem; color: #64748b; margin-top: 4px; }}
 
-    /* Colorful Theme Cards */
-    .card-blue {{ border-left: 6px solid #6366f1; }}
-    .card-green {{ border-left: 6px solid #10b981; }}
-    .card-red {{ border-left: 6px solid #ef4444; }}
-    .card-purple {{ border-left: 6px solid #8b5cf6; }}
-    .card-orange {{ border-left: 6px solid #f59e0b; }}
-    .card-pink {{ border-left: 6px solid #ec4899; }}
-    .card-cyan {{ border-left: 6px solid #06b6d4; }}
-
+    /* Glowing Progress Bars */
     .progress-bar {{
-        width: 100%; height: 6px; background: #e2e8f0; border-radius: 10px; margin: 6px 0; overflow: hidden;
+        width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; margin: 8px 0; overflow: hidden;
     }}
     .progress-fill {{
-        height: 100%; border-radius: 10px; transition: width 0.5s ease;
-        background: linear-gradient(90deg, #6366f1, #8b5cf6);
+        height: 100%; border-radius: 10px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        background: linear-gradient(90deg, #4f46e5, #ec4899);
+        box-shadow: 0 0 15px rgba(236, 72, 153, 0.4);
     }}
 
+    /* Futuristic Buttons */
     .stButton button {{
-        width: 100%; border-radius: 12px; font-weight: 600; border: none;
-        background: #6366f1; color: white; padding: 12px 0; transition: 0.3s;
-        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+        width: 100%; border-radius: 30px; font-weight: 700; border: none;
+        background: linear-gradient(90deg, #4f46e5, #ec4899);
+        color: white; padding: 14px 0; transition: 0.3s;
+        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }}
-    .stButton button:hover {{ background: #4f46e5; transform: scale(1.02); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4); }}
+    .stButton button:hover {{
+        transform: scale(1.05);
+        box-shadow: 0 8px 35px rgba(79, 70, 229, 0.6);
+        background: linear-gradient(90deg, #ec4899, #4f46e5);
+    }}
 
-    /* Dataframe Styling */
+    /* Glass Dataframes */
     .stDataFrame {{
-        background: rgba(255, 255, 255, 0.6);
-        backdrop-filter: blur(8px);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(12px);
         border-radius: 16px;
         padding: 10px;
-        border: 1px solid rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.08);
+        color: white !important;
     }}
+    /* Hide default Streamlit footer */
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
     footer:after {{
-        content: '💎 CashDash v2.0 | Made with ❤️ by Riyaz Pathan';
+        content: '💎 CashDash v3.0 | Made with ❤️ by Riyaz Pathan';
         visibility: visible;
         display: block;
         text-align: center;
         font-size: 0.8rem;
-        color: #94a3b8;
+        color: #64748b;
         padding: 20px 0;
     }}
+    
+    /* Responsive fixes */
     @media (max-width: 768px) {{
         .card {{ padding: 12px 16px; }}
         .card-value {{ font-size: 1.2rem; }}
@@ -168,7 +200,7 @@ st.markdown(f"""
         <span style='color:#94a3b8; margin-left: 10px; font-size:0.9rem;'>📅 {datetime.now().strftime('%d %b %Y')}</span>
     </div>
 </div>
-<hr style='border: none; border-top: 1px solid rgba(255,255,255,0.3); margin: 5px 0 20px 0;'>
+<hr style='border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 5px 0 20px 0;'>
 """, unsafe_allow_html=True)
 
 # ---------- GOOGLE SHEET CONNECTION ----------
@@ -343,7 +375,7 @@ CAT_AUTO = {
     'rent': 'Rent', 'emi': 'EMI', 'education': 'Education'
 }
 
-# ---------- SESSION STATE ----------
+# ---------- SESSION STATE (WITH FIX FOR NEW VARIABLES) ----------
 def init_session_state():
     all_data = load_all_sheets()
 
@@ -490,9 +522,20 @@ def init_session_state():
     else:
         st.session_state.assets = loaded
 
+# FIX: Handle restart gracefully
 if 'initialized' not in st.session_state:
     init_session_state()
     st.session_state.initialized = True
+else:
+    # Force create new session state variables if they are missing on restart
+    if 'liabilities' not in st.session_state:
+        st.session_state.liabilities = pd.DataFrame(columns=['Lender', 'Due Date', 'Total Due', 'Paid', 'Status'])
+    if 'insurance' not in st.session_state:
+        st.session_state.insurance = pd.DataFrame(columns=['Policy', 'Premium', 'Due Date', 'Sum Assured'])
+    if 'tax' not in st.session_state:
+        st.session_state.tax = pd.DataFrame(columns=['Investment Name', 'Amount', 'Category 80C'])
+    if 'assets' not in st.session_state:
+        st.session_state.assets = pd.DataFrame(columns=['Name', 'Purchase Price', 'Purchase Date', 'Lifespan (Months)'])
 
 if 'page' not in st.session_state:
     st.session_state.page = "🏠 Home"
@@ -583,34 +626,34 @@ if st.session_state.page == "🏠 Home":
     total_emi_tenure = active_loans['Tenure (Months)'].sum() if not active_loans.empty else 0
     total_emi_paid = active_loans['Installments Paid'].sum() if not active_loans.empty else 0
 
-    # ----- ROW 1: BANK ACCOUNTS (COLORFUL CARDS) -----
+    # ----- ROW 1: BANK ACCOUNTS (GLOWING CARDS) -----
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"""
-        <div class='card card-blue'>
+        <div class='card'>
             <div class='card-header'>🏦 BOB Bank</div>
-            <div class='card-value' style='color:#6366f1;'>{format_currency(bob_bal)}</div>
+            <div class='card-value' style='color:#60a5fa;'>{format_currency(bob_bal)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div class='card card-purple'>
+        <div class='card'>
             <div class='card-header'>🏦 BOM Bank</div>
-            <div class='card-value' style='color:#8b5cf6;'>{format_currency(bom_bal)}</div>
+            <div class='card-value' style='color:#a78bfa;'>{format_currency(bom_bal)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div class='card card-cyan'>
+        <div class='card'>
             <div class='card-header'>📱 PhonePe Wallet</div>
-            <div class='card-value' style='color:#06b6d4;'>{format_currency(upi_bal)}</div>
+            <div class='card-value' style='color:#22d3ee;'>{format_currency(upi_bal)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col4:
         st.markdown(f"""
-        <div class='card card-green'>
+        <div class='card'>
             <div class='card-header'>💵 Cash</div>
-            <div class='card-value' style='color:#10b981;'>{format_currency(cash_bal)}</div>
+            <div class='card-value' style='color:#34d399;'>{format_currency(cash_bal)}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -618,25 +661,25 @@ if st.session_state.page == "🏠 Home":
     col5, col6, col7 = st.columns(3)
     with col5:
         st.markdown(f"""
-        <div class='card card-green'>
+        <div class='card'>
             <div class='card-header'>📈 Total Income</div>
-            <div class='card-value'>{format_currency(monthly_inc)}</div>
+            <div class='card-value' style='color:#34d399;'>{format_currency(monthly_inc)}</div>
             <div class='card-sub'>This Month</div>
         </div>
         """, unsafe_allow_html=True)
     with col6:
         st.markdown(f"""
-        <div class='card card-red'>
+        <div class='card'>
             <div class='card-header'>📉 Total Expense</div>
-            <div class='card-value'>{format_currency(monthly_exp)}</div>
+            <div class='card-value' style='color:#f87171;'>{format_currency(monthly_exp)}</div>
             <div class='card-sub'>This Month</div>
         </div>
         """, unsafe_allow_html=True)
     with col7:
         st.markdown(f"""
-        <div class='card card-orange'>
+        <div class='card'>
             <div class='card-header'>🎯 This Month Budget</div>
-            <div class='card-value'>{format_currency(total_budget_val)}</div>
+            <div class='card-value' style='color:#fbbf24;'>{format_currency(total_budget_val)}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -644,25 +687,25 @@ if st.session_state.page == "🏠 Home":
     col_inv1, col_inv2, col_inv3 = st.columns(3)
     with col_inv1:
         st.markdown(f"""
-        <div class='card card-purple'>
+        <div class='card'>
             <div class='card-header'>📈 Total Investment</div>
-            <div class='card-value'>{format_currency(total_invested)}</div>
+            <div class='card-value' style='color:#a78bfa;'>{format_currency(total_invested)}</div>
             <div class='card-sub'>Current Value: {format_currency(total_current)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_inv2:
         st.markdown(f"""
-        <div class='card card-orange'>
+        <div class='card'>
             <div class='card-header'>🥇 Gold + SIP</div>
-            <div class='card-value'>{format_currency(sip_gold_inv)}</div>
+            <div class='card-value' style='color:#fbbf24;'>{format_currency(sip_gold_inv)}</div>
             <div class='card-sub'>Current Value: {format_currency(sip_gold_curr)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_inv3:
         st.markdown(f"""
-        <div class='card card-pink'>
+        <div class='card'>
             <div class='card-header'>💳 BC (Bachat Gat)</div>
-            <div class='card-value'>{format_currency(bc_bal)}</div>
+            <div class='card-value' style='color:#f472b6;'>{format_currency(bc_bal)}</div>
             <div class='card-sub'>Your Savings Pool</div>
         </div>
         """, unsafe_allow_html=True)
@@ -673,26 +716,26 @@ if st.session_state.page == "🏠 Home":
         col_emi1, col_emi2, col_emi3 = st.columns(3)
         with col_emi1:
             st.markdown(f"""
-            <div class='card card-red'>
+            <div class='card'>
                 <div class='card-header'>📊 Total Remaining</div>
-                <div class='card-value'>{format_currency(total_emi_remaining)}</div>
+                <div class='card-value' style='color:#f87171;'>{format_currency(total_emi_remaining)}</div>
                 <div class='card-sub'>Across {len(active_loans)} active loans</div>
             </div>
             """, unsafe_allow_html=True)
         with col_emi2:
             st.markdown(f"""
-            <div class='card card-blue'>
+            <div class='card'>
                 <div class='card-header'>📆 Monthly EMI</div>
-                <div class='card-value'>{format_currency(total_emi_monthly)}</div>
+                <div class='card-value' style='color:#60a5fa;'>{format_currency(total_emi_monthly)}</div>
                 <div class='card-sub'>Due on {active_loans.iloc[0]['Installment Day']}th of month</div>
             </div>
             """, unsafe_allow_html=True)
         with col_emi3:
             progress = (total_emi_paid / (total_emi_paid + (total_emi_tenure - total_emi_paid))) * 100 if total_emi_tenure > 0 else 0
             st.markdown(f"""
-            <div class='card card-green'>
+            <div class='card'>
                 <div class='card-header'>📈 Progress</div>
-                <div class='card-value'>{progress:.1f}%</div>
+                <div class='card-value' style='color:#34d399;'>{progress:.1f}%</div>
                 <div class='progress-bar'><div class='progress-fill' style='width: {min(progress,100)}%;'></div></div>
                 <div class='card-sub'>{total_emi_paid} / {total_emi_tenure} installments paid</div>
             </div>
@@ -701,8 +744,8 @@ if st.session_state.page == "🏠 Home":
         for idx, row in active_loans.iterrows():
             loan_progress = ((row['Installments Paid'] / row['Tenure (Months)']) * 100) if row['Tenure (Months)'] > 0 else 0
             st.markdown(f"""
-            <div style='background: rgba(255,255,255,0.5); border-radius: 12px; padding: 10px 16px; margin-bottom: 8px; border-left: 4px solid #6366f1;'>
-                <div style='display: flex; justify-content: space-between; flex-wrap: wrap;'>
+            <div style='background: rgba(255,255,255,0.05); backdrop-filter: blur(8px); border-radius: 16px; padding: 12px 16px; margin-bottom: 8px; border-left: 4px solid #60a5fa;'>
+                <div style='display: flex; justify-content: space-between; flex-wrap: wrap; color: #e2e8f0;'>
                     <span><strong>{row['Lender']}</strong></span>
                     <span>Remaining: {format_currency(row['Remaining Due'])}</span>
                     <span>EMI: {format_currency(row['EMI Amount'])}</span>
@@ -714,7 +757,7 @@ if st.session_state.page == "🏠 Home":
     else:
         st.info("No active loans. Add a loan in ⚡ More → EMI Manager.")
 
-    # ----- ROW 5: NO-SPEND DAY TRACKER + STREAK (CLEAN GRID) -----
+    # ----- ROW 5: NO-SPEND DAY TRACKER + STREAK -----
     st.markdown("### 🏆 No-Spend Day Tracker")
     today = datetime.now().date()
     first_day = today.replace(day=1)
@@ -723,7 +766,6 @@ if st.session_state.page == "🏠 Home":
     else:
         last_day = (first_day + timedelta(days=32)).replace(day=1) - timedelta(days=1)
     
-    # Create map: date -> spent amount
     spend_map = {d.strftime('%Y-%m-%d'): 0 for d in pd.date_range(first_day, last_day)}
     if not df_tx.empty:
         df_tx_cpy = df_tx.copy()
@@ -733,7 +775,6 @@ if st.session_state.page == "🏠 Home":
             if date_str in spend_map:
                 spend_map[date_str] = 1
     
-    # Calculate streak
     streak = 0
     for d in sorted(spend_map.keys(), reverse=True):
         if spend_map[d] == 0:
@@ -741,38 +782,30 @@ if st.session_state.page == "🏠 Home":
         else:
             break
     
-    # Display mini calendar (7 columns)
-    st.markdown(f"<div style='margin-bottom:10px;'><strong>🔥 Current Streak: {streak} days</strong></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='margin-bottom:10px; color:#fbbf24;'><strong>🔥 Current Streak: {streak} days</strong></div>", unsafe_allow_html=True)
     days = list(spend_map.keys())
-    # Split into weeks
     for i in range(0, len(days), 7):
         cols = st.columns(7)
         for j in range(7):
             if i+j < len(days):
                 d_str = days[i+j]
-                color = "#10b981" if spend_map[d_str] == 0 else "#ef4444"
+                color = "#34d399" if spend_map[d_str] == 0 else "#f87171"
                 date_obj = datetime.strptime(d_str, '%Y-%m-%d')
                 day_num = date_obj.day
                 cols[j].markdown(f"""
-                <div style='background:{color}; color:white; border-radius:10px; text-align:center; padding:6px 0; font-weight:600; font-size:0.9rem;'>
+                <div style='background:{color}; color:#0f172a; border-radius:12px; text-align:center; padding:8px 0; font-weight:700; font-size:1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2);'>
                     {day_num}
                 </div>
                 """, unsafe_allow_html=True)
 
-    # ----- ROW 6: NET WORTH CHART (TIME-SERIES) -----
+    # ----- ROW 6: NET WORTH CHART -----
     st.markdown("### 📈 Net Worth Trend (This Month)")
     if not df_tx.empty:
-        # Calculate daily net worth
         df_net = df_tx.copy()
         df_net['Date'] = pd.to_datetime(df_net['Date']).dt.date
-        # Get total accounts balance at start of month (approx)
-        total_balance = bob_bal + bom_bal + upi_bal + cash_bal + bc_bal + total_current
-        # Create daily cumulative income/expense
         daily_sum = df_net.groupby('Date')['Amount'].sum().reset_index()
-        daily_sum['Type'] = df_net.groupby('Date')['Type'].first().reset_index(drop=True) # not perfect but okay
-        # Simple: Just plot daily expense and income bars
         fig_net = px.line(daily_sum, x='Date', y='Amount', title='Daily Net Cash Flow', markers=True)
-        fig_net.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
+        fig_net.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#e2e8f0'), margin=dict(l=0,r=0,t=20,b=0))
         st.plotly_chart(fig_net, use_container_width=True)
     else:
         st.info("No transactions yet to show Net Worth trend.")
@@ -825,7 +858,7 @@ if st.session_state.page == "🏠 Home":
             if success: st.success(msg)
             else: st.error(msg)
     with col_sync2:
-        st.markdown(f"<div style='text-align:right; font-size:0.7rem; color:#94a3b8;'>Last synced: {st.session_state.last_sync_time}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:right; font-size:0.7rem; color:#64748b;'>Last synced: {st.session_state.last_sync_time}</div>", unsafe_allow_html=True)
 
 # ===================== ADD TRANSACTION =====================
 elif st.session_state.page == "➕ Add":
@@ -839,26 +872,20 @@ elif st.session_state.page == "➕ Add":
     with col1:
         date = st.date_input("Date", datetime.now())
         desc = st.text_input("Description", key="desc_input")
-        # Auto-categorize
         suggested_cat = None
         for kw, cat in CAT_AUTO.items():
             if kw in desc.lower():
                 suggested_cat = cat
                 break
-        
         amount = st.number_input("Amount ₹", min_value=0.0)
     with col2:
         type_options = ["Expense", "Income", "Transfer", "Investment", "Loan"]
         ttype = st.selectbox("Type", type_options)
-
-        # Category with auto-suggest
         category = st.selectbox("Category", budget_cats + ["Other", "Food", "Travel", "Mobile", "EMI", "Shopping", "Fuel", "Rent", "Education"], index=0)
-        if suggested_cat and category == budget_cats[0]: # if default selected, suggest
+        if suggested_cat and category == budget_cats[0]:
             category = suggested_cat
-
         payment_mode = st.selectbox("Payment Mode", ["BOB Bank", "BOM Bank", "PhonePe Wallet", "Cash"])
 
-    # Split Expense
     split_with = None
     if ttype == "Expense":
         split_options = ["Self", "Friend", "Partner", "Family"]
@@ -866,10 +893,8 @@ elif st.session_state.page == "➕ Add":
         if split_with != "Self":
             st.info(f"💡 Expense will be split between Self and {split_with}. Main entry amount is full amount.")
 
-    # Receipt Upload
     receipt_file = st.file_uploader("📎 Upload Receipt (Optional)", type=["png", "jpg", "jpeg"])
 
-    # EMI fields
     is_emi = (ttype == "Expense") and (category and 'emi' in category.lower())
     emi_loan = None
     if is_emi:
@@ -882,7 +907,6 @@ elif st.session_state.page == "➕ Add":
                 emi_row = st.session_state.emi[st.session_state.emi['Lender'] == emi_loan].iloc[0]
                 st.info(f"💡 Remaining: {format_currency(emi_row['Remaining Due'])}. After payment: {format_currency(emi_row['Remaining Due'] - amount)}")
 
-    # Investment Name
     inv_name = None
     if ttype == "Investment" and category != "BC":
         inv_names = st.session_state.investments['Name'].tolist() if not st.session_state.investments.empty else []
@@ -891,7 +915,6 @@ elif st.session_state.page == "➕ Add":
         if inv_name == 'New Investment':
             inv_name = st.text_input("Enter new investment name")
 
-    # Fuel fields
     is_fuel = (ttype == "Expense") and (category == 'Fuel' or (category and 'fuel' in category.lower()))
     f_dist = None
     f_litres = None
@@ -907,7 +930,6 @@ elif st.session_state.page == "➕ Add":
                 desc = f"Fuel - {f_litres:.1f} L"
 
     if st.button("✅ Add Transaction", key="submit_btn"):
-        # Duplicate Check (last 10 mins)
         duplicate = False
         if not st.session_state.transactions.empty:
             df_last = st.session_state.transactions.copy()
@@ -925,12 +947,10 @@ elif st.session_state.page == "➕ Add":
                 st.error("❌ Amount must be greater than 0!")
             else:
                 try:
-                    # Process receipt image
                     receipt_b64 = None
                     if receipt_file:
                         receipt_b64 = base64.b64encode(receipt_file.read()).decode('utf-8')
 
-                    # Split Amount logic
                     actual_amount = amount
                     if split_with and split_with != "Self":
                         actual_amount = amount / 2
@@ -951,9 +971,7 @@ elif st.session_state.page == "➕ Add":
                     st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
                     append_to_worksheet('Transactions', new_row)
 
-                    # Update Balances (same as existing logic)
                     if ttype == "Transfer":
-                        # (existing transfer logic - keeping it as is)
                         pass
                     else:
                         if category == "BC" and ttype == "Investment":
@@ -974,7 +992,6 @@ elif st.session_state.page == "➕ Add":
                                     st.session_state.accounts.loc[idx, 'Balance'] -= actual_amount
                                 update_worksheet('Accounts', st.session_state.accounts)
 
-                    # EMI Update
                     if is_emi and ttype == "Expense" and emi_loan and actual_amount > 0:
                         emi_idx = st.session_state.emi[st.session_state.emi['Lender'] == emi_loan].index[0]
                         current_remaining = st.session_state.emi.loc[emi_idx, 'Remaining Due']
@@ -986,7 +1003,6 @@ elif st.session_state.page == "➕ Add":
                                 st.session_state.emi.loc[emi_idx, 'Installments Paid'] = st.session_state.emi.loc[emi_idx, 'Tenure (Months)']
                             update_worksheet('EmiManager', st.session_state.emi)
 
-                    # Investment Update
                     if ttype == "Investment" and category != "BC" and inv_name and actual_amount > 0:
                         if inv_name in st.session_state.investments['Name'].values:
                             idx_inv = st.session_state.investments[st.session_state.investments['Name'] == inv_name].index[0]
@@ -1002,7 +1018,6 @@ elif st.session_state.page == "➕ Add":
                             st.session_state.investments = pd.concat([st.session_state.investments, new_inv], ignore_index=True)
                         update_worksheet('Investments', st.session_state.investments)
 
-                    # Fuel Update
                     if is_fuel and ttype == "Expense" and f_dist is not None and f_litres is not None:
                         fuel_row = [date.strftime('%Y-%m-%d'), f_dist, f_litres, actual_amount]
                         st.session_state.fuel = pd.concat([st.session_state.fuel, pd.DataFrame([{
@@ -1010,7 +1025,6 @@ elif st.session_state.page == "➕ Add":
                         }])], ignore_index=True)
                         update_worksheet('FuelTracker', st.session_state.fuel)
 
-                    # Budget Update
                     if category not in st.session_state.budget['Category'].values and category not in ['Transfer', 'Loan Taken', 'Loan Returned', 'BC']:
                         new_budget_row = pd.DataFrame({
                             'Category': [category], 'Current Month Budget': [0.0], 'Previous Month Budget': [0.0],
@@ -1051,37 +1065,36 @@ elif st.session_state.page == "🎯 Budget":
     col_t1, col_t2, col_t3, col_t4 = st.columns(4)
     with col_t1:
         st.markdown(f"""
-        <div class='card card-blue'>
+        <div class='card'>
             <div class='card-header'>💰 Category Budget</div>
-            <div class='card-value'>{format_currency(total_budget_val)}</div>
+            <div class='card-value' style='color:#60a5fa;'>{format_currency(total_budget_val)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_t2:
         st.markdown(f"""
-        <div class='card card-purple'>
+        <div class='card'>
             <div class='card-header'>🎯 Master Cap</div>
-            <div class='card-value'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div>
+            <div class='card-value' style='color:#a78bfa;'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_t3:
         st.markdown(f"""
-        <div class='card card-red'>
+        <div class='card'>
             <div class='card-header'>📉 Total Spent</div>
-            <div class='card-value'>{format_currency(total_spent_val)}</div>
+            <div class='card-value' style='color:#f87171;'>{format_currency(total_spent_val)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_t4:
-        status_color = "#10b981" if remaining_val >= 0 else "#ef4444"
+        status_color = "#34d399" if remaining_val >= 0 else "#f87171"
         status_text = "✅ On Track" if remaining_val >= 0 else "⚠️ Over Budget"
         st.markdown(f"""
-        <div class='card card-{"green" if remaining_val>=0 else "red"}'>
+        <div class='card'>
             <div class='card-header'>✅ Remaining</div>
             <div class='card-value' style='color:{status_color};'>{format_currency(remaining_val)}</div>
             <div class='card-sub'>{status_text}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # BUDGET ALERTS (New Feature)
     st.markdown("### 🚨 Budget Alerts")
     alert_count = 0
     for _, row in df.iterrows():
@@ -1096,20 +1109,109 @@ elif st.session_state.page == "🎯 Budget":
     if alert_count == 0:
         st.success("✅ All categories are within budget limits!")
 
-    # (Rest of Budget UI - I'll keep your existing logic for edit/delete, just adding alerts above)
-
 # ===================== BANK =====================
-# (Your existing bank code is perfect, no changes needed)
+elif st.session_state.page == "🏦 Bank":
+    st.subheader("🏦 My Accounts")
+    st.dataframe(st.session_state.accounts.style.format({'Balance': '₹ {:.0f}'}), use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.markdown("### 💰 Quick Actions")
+    with st.expander("➕ Add Money"):
+        acc_add = st.selectbox("Select Account", st.session_state.accounts['Account'], key='add_acc')
+        amt_add = st.number_input("Amount ₹", min_value=0.0, step=100.0, key='add_amt')
+        desc_add = st.text_input("Description (optional)", value="Cash Deposit", key='add_desc')
+        if st.button("Add Money", key="add_money_btn"):
+            if amt_add > 0:
+                idx = st.session_state.accounts[st.session_state.accounts['Account'] == acc_add].index[0]
+                st.session_state.accounts.loc[idx, 'Balance'] += amt_add
+                new_row = [datetime.now().strftime('%Y-%m-%d'), desc_add, "Deposit", amt_add, "Income", acc_add, '✅']
+                new_df = pd.DataFrame([{
+                    'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_add, 'Category': "Deposit",
+                    'Amount': amt_add, 'Type': "Income", 'Payment Mode': acc_add, 'Status': '✅'
+                }])
+                st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+                append_to_worksheet('Transactions', new_row)
+                update_worksheet('Accounts', st.session_state.accounts)
+                st.success(f"✅ {format_currency(amt_add)} added to {acc_add}")
+                st.session_state.page = "🏠 Home"
+                st.cache_data.clear()
+                st.rerun()
+            else:
+                st.error("Amount must be greater than 0.")
+
+    with st.expander("➖ Withdraw Money"):
+        acc_with = st.selectbox("Select Account", st.session_state.accounts['Account'], key='with_acc')
+        amt_with = st.number_input("Amount ₹", min_value=0.0, step=100.0, key='with_amt')
+        desc_with = st.text_input("Description (optional)", value="Cash Withdrawal", key='with_desc')
+        if st.button("Withdraw", key="withdraw_btn"):
+            if amt_with > 0:
+                idx = st.session_state.accounts[st.session_state.accounts['Account'] == acc_with].index[0]
+                current_bal = st.session_state.accounts.loc[idx, 'Balance']
+                if current_bal >= amt_with:
+                    st.session_state.accounts.loc[idx, 'Balance'] -= amt_with
+                    new_row = [datetime.now().strftime('%Y-%m-%d'), desc_with, "Withdrawal", amt_with, "Expense", acc_with, '✅']
+                    new_df = pd.DataFrame([{
+                        'Date': datetime.now().strftime('%Y-%m-%d'), 'Description': desc_with, 'Category': "Withdrawal",
+                        'Amount': amt_with, 'Type': "Expense", 'Payment Mode': acc_with, 'Status': '✅'
+                    }])
+                    st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+                    append_to_worksheet('Transactions', new_row)
+                    update_worksheet('Accounts', st.session_state.accounts)
+                    st.success(f"✅ {format_currency(amt_with)} withdrawn from {acc_with}")
+                    st.session_state.page = "🏠 Home"
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("❌ Insufficient balance!")
+            else:
+                st.error("Amount must be greater than 0.")
+
+    with st.expander("🔄 Transfer"):
+        from_acc = st.selectbox("From Account", st.session_state.accounts['Account'], key='trans_from')
+        to_acc = st.selectbox("To Account", st.session_state.accounts['Account'], key='trans_to')
+        amt_trans = st.number_input("Amount ₹", min_value=0.0, step=100.0, key='trans_amt')
+        desc_trans = st.text_input("Description (optional)", value="Internal Transfer", key='trans_desc')
+        if st.button("Transfer", key="transfer_btn"):
+            if amt_trans > 0:
+                if from_acc == to_acc:
+                    st.error("From and To accounts must be different.")
+                else:
+                    from_idx = st.session_state.accounts[st.session_state.accounts['Account'] == from_acc].index[0]
+                    from_bal = st.session_state.accounts.loc[from_idx, 'Balance']
+                    if from_bal >= amt_trans:
+                        to_idx = st.session_state.accounts[st.session_state.accounts['Account'] == to_acc].index[0]
+                        st.session_state.accounts.loc[from_idx, 'Balance'] -= amt_trans
+                        st.session_state.accounts.loc[to_idx, 'Balance'] += amt_trans
+                        new_row = [datetime.now().strftime('%Y-%m-%d'), f"{desc_trans} (From {from_acc} to {to_acc})", "Transfer", amt_trans, "Transfer", f"{from_acc} -> {to_acc}", '✅']
+                        new_df = pd.DataFrame([{
+                            'Date': datetime.now().strftime('%Y-%m-%d'),
+                            'Description': f"{desc_trans} (From {from_acc} to {to_acc})",
+                            'Category': "Transfer",
+                            'Amount': amt_trans,
+                            'Type': "Transfer",
+                            'Payment Mode': f"{from_acc} -> {to_acc}",
+                            'Status': '✅'
+                        }])
+                        st.session_state.transactions = pd.concat([st.session_state.transactions, new_df], ignore_index=True)
+                        append_to_worksheet('Transactions', new_row)
+                        update_worksheet('Accounts', st.session_state.accounts)
+                        st.success(f"✅ {format_currency(amt_trans)} transferred from {from_acc} to {to_acc}")
+                        st.session_state.page = "🏠 Home"
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.error("❌ Insufficient balance in source account!")
+            else:
+                st.error("Amount must be greater than 0.")
 
 # ===================== MORE =====================
 elif st.session_state.page == "⚡ More":
     st.subheader("🚀 Premium Modules")
-
     tabs = st.tabs(["📈 Investments", "🏦 EMI Manager", "🎯 Goals", "📊 Reports", 
                     "💳 Liabilities", "🛡️ Insurance", "🧮 Tax", "🏠 Assets", 
                     "📁 Import/Export", "⚙️ Customization", "📋 All Transactions", "🔄 Recurring", "🤖 AI Assistant"])
 
-    # --- INVESTMENTS (Existing - but adding auto-update) ---
+    # --- INVESTMENTS ---
     with tabs[0]:
         st.markdown("#### 💼 Your Investments")
         if st.button("🔄 Update Current Values (Gold & SIP)"):
@@ -1136,11 +1238,10 @@ elif st.session_state.page == "⚡ More":
                 st.info("No investments with units found. Add transactions with Gold/SIP to track.")
         st.dataframe(st.session_state.investments, hide_index=True, use_container_width=True)
 
-    # --- EMI MANAGER (Prepayment Calculator Added) ---
+    # --- EMI MANAGER ---
     with tabs[1]:
         st.markdown("### 🏦 Loan EMI Manager")
         st.dataframe(st.session_state.emi, use_container_width=True, hide_index=True)
-        
         with st.expander("🧮 Loan Prepayment Calculator"):
             if not st.session_state.emi.empty:
                 loan_sel = st.selectbox("Select Loan", st.session_state.emi['Lender'])
@@ -1151,7 +1252,6 @@ elif st.session_state.page == "⚡ More":
                         remaining = row['Remaining Due']
                         emi = row['EMI Amount']
                         monthly_rate = (row['Interest Charged'] / row['Total Loan']) / row['Tenure (Months)'] if row['Total Loan'] > 0 else 0
-                        # Rough calculation
                         new_tenure = -np.log(1 - (remaining * monthly_rate) / (emi + extra)) / np.log(1 + monthly_rate) if monthly_rate > 0 else 0
                         st.info(f"💡 If you pay ₹{extra:.0f} extra now, you will save interest and finish the loan in approx {new_tenure:.1f} months (vs {row['Tenure (Months)'] - row['Installments Paid']} months left).")
                     else:
@@ -1159,30 +1259,25 @@ elif st.session_state.page == "⚡ More":
             else:
                 st.info("Add a loan first.")
 
-    # --- REPORTS (New Charts) ---
+    # --- REPORTS ---
     with tabs[3]:
         st.markdown("### 📊 Advanced Reports")
         df = st.session_state.transactions
         if not df.empty:
             df['Date'] = pd.to_datetime(df['Date'])
             df['Month'] = df['Date'].dt.month_name()
-            
-            # Cashflow Forecast (3 Months)
             st.markdown("#### 📆 Cashflow Forecast (Next 3 Months)")
             st.info("Coming soon: Auto-calculated from recurring transactions.")
             
-            # Spending Heatmap
             st.markdown("#### 🗓️ Spending Heatmap")
             df_heat = df[df['Type']=='Expense'].copy()
             if not df_heat.empty:
                 df_heat['Day'] = df_heat['Date'].dt.day_name()
                 df_heat['Week'] = df_heat['Date'].dt.isocalendar().week
-                pivot = df_heat.pivot_table(index='Week', columns='Day', values='Amount', aggfunc='sum', fill_value=0)
                 fig_heat = px.density_heatmap(df_heat, x='Day', y='Week', z='Amount', title='Spending Heatmap')
-                fig_heat.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+                fig_heat.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#e2e8f0'))
                 st.plotly_chart(fig_heat, use_container_width=True)
 
-            # Sankey Diagram
             st.markdown("#### 🔀 Income to Expense Flow")
             inc_df = df[df['Type']=='Income'].groupby('Category')['Amount'].sum().reset_index()
             exp_df = df[df['Type']=='Expense'].groupby('Category')['Amount'].sum().reset_index()
@@ -1190,9 +1285,7 @@ elif st.session_state.page == "⚡ More":
                 nodes = list(inc_df['Category']) + list(exp_df['Category'])
                 node_indices = {name: i for i, name in enumerate(nodes)}
                 source = [node_indices[n] for n in inc_df['Category']]
-                target = [node_indices[n] for n in exp_df['Category']] # This is a simplistic mapping
-                # Better approach: Map by income labels to expense labels
-                # For demo, just show a generic flow
+                target = [node_indices[n] for n in exp_df['Category']]
                 st.plotly_chart(go.Figure(data=[go.Sankey(
                     node=dict(pad=15, thickness=20, line=dict(color="black", width=0.5),
                               label=nodes, color="blue"),
@@ -1201,10 +1294,13 @@ elif st.session_state.page == "⚡ More":
         else:
             st.info("No transactions available for reports.")
 
-    # --- LIABILITIES (New) ---
+    # --- LIABILITIES ---
     with tabs[4]:
         st.markdown("#### 💳 Liabilities (Credit Cards / Dues)")
-        st.dataframe(st.session_state.liabilities, hide_index=True, use_container_width=True)
+        if 'liabilities' in st.session_state:
+            st.dataframe(st.session_state.liabilities, hide_index=True, use_container_width=True)
+        else:
+            st.info("Liabilities data is initializing...")
         with st.form("add_liability"):
             c1, c2 = st.columns(2)
             with c1:
@@ -1221,7 +1317,7 @@ elif st.session_state.page == "⚡ More":
                 st.success("Liability added!")
                 st.rerun()
 
-    # --- INSURANCE (New) ---
+    # --- INSURANCE ---
     with tabs[5]:
         st.markdown("#### 🛡️ Insurance Tracker")
         st.dataframe(st.session_state.insurance, hide_index=True, use_container_width=True)
@@ -1241,7 +1337,7 @@ elif st.session_state.page == "⚡ More":
                 st.success("Insurance added!")
                 st.rerun()
 
-    # --- TAX (New) ---
+    # --- TAX ---
     with tabs[6]:
         st.markdown("#### 🧮 Tax 80C Planner")
         st.dataframe(st.session_state.tax, hide_index=True, use_container_width=True)
@@ -1259,7 +1355,7 @@ elif st.session_state.page == "⚡ More":
                 st.success("Tax investment added!")
                 st.rerun()
 
-    # --- ASSETS (New) ---
+    # --- ASSETS ---
     with tabs[7]:
         st.markdown("#### 🏠 Asset Depreciation Calculator")
         st.dataframe(st.session_state.assets, hide_index=True, use_container_width=True)
@@ -1279,10 +1375,9 @@ elif st.session_state.page == "⚡ More":
                 st.success("Asset added!")
                 st.rerun()
 
-    # --- IMPORT/EXPORT (New) ---
+    # --- IMPORT/EXPORT ---
     with tabs[8]:
         st.markdown("#### 📁 Data Import / Export")
-        # Export Excel
         if st.button("📥 Export All Data to Excel"):
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -1293,7 +1388,6 @@ elif st.session_state.page == "⚡ More":
                 st.session_state.emi.to_excel(writer, sheet_name='EMI', index=False)
             st.download_button(label="📥 Download Excel File", data=output.getvalue(), file_name="CashDash_Backup.xlsx", mime="application/vnd.ms-excel")
         
-        # CSV Import
         st.markdown("#### 📤 Bulk Import Transactions (CSV)")
         uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
         if uploaded_file:
@@ -1309,7 +1403,6 @@ elif st.session_state.page == "⚡ More":
             except Exception as e:
                 st.error(f"Error parsing CSV: {e}")
 
-        # JSON Backup
         if st.button("💾 Download JSON Backup"):
             backup = {
                 'transactions': st.session_state.transactions.to_dict(),
@@ -1318,24 +1411,21 @@ elif st.session_state.page == "⚡ More":
             }
             st.download_button(label="📥 Download JSON", data=json.dumps(backup, indent=2), file_name="CashDash_Backup.json", mime="application/json")
 
-    # --- RECURRING (Auto-Add Feature) ---
+    # --- RECURRING (Auto-Add) ---
     with tabs[11]:
         st.markdown("### 🔄 Recurring Transactions")
         st.dataframe(st.session_state.recurring, hide_index=True, use_container_width=True)
-        
         if st.button("🔄 Execute All Due Recurring"):
             today_str = datetime.now().strftime('%Y-%m-%d')
             executed = 0
             for idx, row in st.session_state.recurring.iterrows():
                 if row['NextDate'] == today_str:
-                    # Add to transactions
                     new_tx = pd.DataFrame([{
                         'Date': today_str, 'Description': row['Description'], 'Category': row['Category'],
                         'Amount': row['Amount'], 'Type': row['Type'], 'Payment Mode': row['Payment Mode'], 'Status': '✅'
                     }])
                     st.session_state.transactions = pd.concat([st.session_state.transactions, new_tx], ignore_index=True)
                     append_to_worksheet('Transactions', [today_str, row['Description'], row['Category'], row['Amount'], row['Type'], row['Payment Mode'], '✅'])
-                    # Update next date
                     if row['Frequency'] == 'Daily':
                         next_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
                     elif row['Frequency'] == 'Weekly':
@@ -1353,5 +1443,3 @@ elif st.session_state.page == "⚡ More":
                 st.rerun()
             else:
                 st.info("No recurring transactions due today.")
-
-    # (Keep existing Customization, Transactions, AI Assistant tabs as they are)
