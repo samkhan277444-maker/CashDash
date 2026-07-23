@@ -24,11 +24,11 @@ if not st.session_state.authenticated:
     st.markdown("""
     <style>
         .pin-container { text-align: center; margin-top: 100px; }
-        .pin-box { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); padding: 50px; border-radius: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); display: inline-block; border: 1px solid rgba(255,255,255,0.1); color: white; }
-        .stTextInput input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 12px; }
+        .pin-box { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); padding: 50px; border-radius: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); display: inline-block; border: 1px solid rgba(255,255,255,0.5); color: #1e293b; }
+        .stTextInput input { background: rgba(255,255,255,0.8); border: 1px solid #cbd5e1; color: #1e293b; border-radius: 12px; }
     </style>
     <div class="pin-container"><div class="pin-box">
-    <h2 style="margin-bottom:20px; background: linear-gradient(90deg, #f472b6, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🔒 Enter PIN</h2>
+    <h2 style="margin-bottom:20px; background: linear-gradient(90deg, #4f46e5, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🔒 Enter PIN</h2>
     """, unsafe_allow_html=True)
     pin_input = st.text_input("", type="password", placeholder="Enter 4-digit PIN", key="pin_input")
     if st.button("Unlock App"):
@@ -40,12 +40,12 @@ if not st.session_state.authenticated:
     st.markdown("</div></div>", unsafe_allow_html=True)
     st.stop()
 
-# ---------- UNIQUE SPACE GLASS THEME (ADVANCED CSS) ----------
+# ---------- LIGHT GREEN & BLUE THEME + BIGGER TABS (ADVANCED CSS) ----------
 CSS = f"""
 <style>
-    /* Dark Space Gradient Background */
+    /* Light Green & Blue Gradient Background */
     .stApp {{
-        background: radial-gradient(circle at 10% 20%, #0f172a 0%, #1e1b4b 50%, #2e1065 100%);
+        background: linear-gradient(135deg, #dbeafe 0%, #d1fae5 100%);
         min-height: 100vh;
     }}
     
@@ -55,7 +55,7 @@ CSS = f"""
         100% {{ background-position: 200% center; }}
     }}
     .custom-header {{
-        background: linear-gradient(90deg, #f472b6, #a78bfa, #60a5fa, #f472b6);
+        background: linear-gradient(90deg, #4f46e5, #ec4899, #4f46e5);
         background-size: 300% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -66,28 +66,28 @@ CSS = f"""
         display: inline-block;
     }}
     .custom-badge {{
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.5);
         backdrop-filter: blur(4px);
         border-radius: 30px;
         padding: 6px 18px;
         font-size: 0.8rem;
-        color: #a78bfa;
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #4f46e5;
+        border: 1px solid rgba(255, 255, 255, 0.8);
         display: inline-block;
         margin-left: 12px;
     }}
-    .greeting-text {{ color: #e2e8f0; font-size: 1.2rem; font-weight: 500; }}
+    .greeting-text {{ color: #1e293b; font-size: 1.2rem; font-weight: 500; }}
     
     /* Premium Glass Cards with Glowing Effects */
     .card {{
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         border-radius: 24px;
         padding: 20px 24px;
         margin-bottom: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         position: relative;
         overflow: hidden;
@@ -110,7 +110,7 @@ CSS = f"""
     }}
     .card:hover {{
         transform: translateY(-8px) scale(1.02);
-        box-shadow: 0 16px 64px rgba(79, 70, 229, 0.25);
+        box-shadow: 0 16px 64px rgba(79, 70, 229, 0.15);
     }}
     @keyframes borderGlow {{
         0% {{ background-position: 0% 50%; }}
@@ -118,13 +118,13 @@ CSS = f"""
         100% {{ background-position: 0% 50%; }}
     }}
     
-    .card-header {{ font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; }}
-    .card-value {{ font-size: 1.8rem; font-weight: 800; color: #f8fafc; }}
+    .card-header {{ font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; }}
+    .card-value {{ font-size: 1.8rem; font-weight: 800; color: #0f172a; }}
     .card-sub {{ font-size: 0.65rem; color: #64748b; margin-top: 4px; }}
 
     /* Glowing Progress Bars */
     .progress-bar {{
-        width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; margin: 8px 0; overflow: hidden;
+        width: 100%; height: 6px; background: rgba(255,255,255,0.5); border-radius: 10px; margin: 8px 0; overflow: hidden;
     }}
     .progress-fill {{
         height: 100%; border-radius: 10px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -147,14 +147,43 @@ CSS = f"""
         background: linear-gradient(90deg, #ec4899, #4f46e5);
     }}
 
+    /* BIGGER TABS FOR MORE, BANK, ADD */
+    .stTabs [data-baseweb="tab-list"] button {{
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        padding: 12px 24px !important;
+        margin: 0 6px !important;
+        border-radius: 16px !important;
+        transition: all 0.3s ease !important;
+        color: #475569 !important;
+        background: rgba(255, 255, 255, 0.4) !important;
+        border: 1px solid transparent !important;
+    }}
+    .stTabs [data-baseweb="tab-list"] button:hover {{
+        background: rgba(255, 255, 255, 0.8) !important;
+        transform: translateY(-2px) !important;
+    }}
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {{
+        background: rgba(255, 255, 255, 0.9) !important;
+        color: #4f46e5 !important;
+        box-shadow: 0 4px 14px rgba(79, 70, 229, 0.15) !important;
+        border-bottom: 3px solid #4f46e5 !important;
+    }}
+
     /* Glass Dataframes */
     .stDataFrame {{
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.5);
+        backdrop-filter: blur(8px);
         border-radius: 16px;
         padding: 10px;
-        border: 1px solid rgba(255,255,255,0.08);
-        color: white !important;
+        border: 1px solid rgba(255,255,255,0.8);
+        color: #1e293b !important;
+    }}
+    /* Alerts & Info */
+    .stAlert {{
+        background: rgba(255, 255, 255, 0.8) !important;
+        color: #1e293b !important;
+        border: 1px solid rgba(255,255,255,0.9) !important;
     }}
     /* Hide default Streamlit footer */
     #MainMenu {{visibility: hidden;}}
@@ -197,10 +226,10 @@ st.markdown(f"""
     </div>
     <div>
         <span class='greeting-text'>{greeting}, Riyaz! 👋</span>
-        <span style='color:#94a3b8; margin-left: 10px; font-size:0.9rem;'>📅 {datetime.now().strftime('%d %b %Y')}</span>
+        <span style='color:#64748b; margin-left: 10px; font-size:0.9rem;'>📅 {datetime.now().strftime('%d %b %Y')}</span>
     </div>
 </div>
-<hr style='border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 5px 0 20px 0;'>
+<hr style='border: none; border-top: 1px solid rgba(255,255,255,0.5); margin: 5px 0 20px 0;'>
 """, unsafe_allow_html=True)
 
 # ---------- GOOGLE SHEET CONNECTION ----------
@@ -632,28 +661,28 @@ if st.session_state.page == "🏠 Home":
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>🏦 BOB Bank</div>
-            <div class='card-value' style='color:#60a5fa;'>{format_currency(bob_bal)}</div>
+            <div class='card-value' style='color:#4f46e5;'>{format_currency(bob_bal)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>🏦 BOM Bank</div>
-            <div class='card-value' style='color:#a78bfa;'>{format_currency(bom_bal)}</div>
+            <div class='card-value' style='color:#7c3aed;'>{format_currency(bom_bal)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>📱 PhonePe Wallet</div>
-            <div class='card-value' style='color:#22d3ee;'>{format_currency(upi_bal)}</div>
+            <div class='card-value' style='color:#0891b2;'>{format_currency(upi_bal)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col4:
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>💵 Cash</div>
-            <div class='card-value' style='color:#34d399;'>{format_currency(cash_bal)}</div>
+            <div class='card-value' style='color:#059669;'>{format_currency(cash_bal)}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -663,7 +692,7 @@ if st.session_state.page == "🏠 Home":
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>📈 Total Income</div>
-            <div class='card-value' style='color:#34d399;'>{format_currency(monthly_inc)}</div>
+            <div class='card-value' style='color:#059669;'>{format_currency(monthly_inc)}</div>
             <div class='card-sub'>This Month</div>
         </div>
         """, unsafe_allow_html=True)
@@ -671,7 +700,7 @@ if st.session_state.page == "🏠 Home":
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>📉 Total Expense</div>
-            <div class='card-value' style='color:#f87171;'>{format_currency(monthly_exp)}</div>
+            <div class='card-value' style='color:#dc2626;'>{format_currency(monthly_exp)}</div>
             <div class='card-sub'>This Month</div>
         </div>
         """, unsafe_allow_html=True)
@@ -679,7 +708,7 @@ if st.session_state.page == "🏠 Home":
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>🎯 This Month Budget</div>
-            <div class='card-value' style='color:#fbbf24;'>{format_currency(total_budget_val)}</div>
+            <div class='card-value' style='color:#d97706;'>{format_currency(total_budget_val)}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -689,7 +718,7 @@ if st.session_state.page == "🏠 Home":
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>📈 Total Investment</div>
-            <div class='card-value' style='color:#a78bfa;'>{format_currency(total_invested)}</div>
+            <div class='card-value' style='color:#7c3aed;'>{format_currency(total_invested)}</div>
             <div class='card-sub'>Current Value: {format_currency(total_current)}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -697,7 +726,7 @@ if st.session_state.page == "🏠 Home":
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>🥇 Gold + SIP</div>
-            <div class='card-value' style='color:#fbbf24;'>{format_currency(sip_gold_inv)}</div>
+            <div class='card-value' style='color:#d97706;'>{format_currency(sip_gold_inv)}</div>
             <div class='card-sub'>Current Value: {format_currency(sip_gold_curr)}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -705,7 +734,7 @@ if st.session_state.page == "🏠 Home":
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>💳 BC (Bachat Gat)</div>
-            <div class='card-value' style='color:#f472b6;'>{format_currency(bc_bal)}</div>
+            <div class='card-value' style='color:#db2777;'>{format_currency(bc_bal)}</div>
             <div class='card-sub'>Your Savings Pool</div>
         </div>
         """, unsafe_allow_html=True)
@@ -718,7 +747,7 @@ if st.session_state.page == "🏠 Home":
             st.markdown(f"""
             <div class='card'>
                 <div class='card-header'>📊 Total Remaining</div>
-                <div class='card-value' style='color:#f87171;'>{format_currency(total_emi_remaining)}</div>
+                <div class='card-value' style='color:#dc2626;'>{format_currency(total_emi_remaining)}</div>
                 <div class='card-sub'>Across {len(active_loans)} active loans</div>
             </div>
             """, unsafe_allow_html=True)
@@ -726,7 +755,7 @@ if st.session_state.page == "🏠 Home":
             st.markdown(f"""
             <div class='card'>
                 <div class='card-header'>📆 Monthly EMI</div>
-                <div class='card-value' style='color:#60a5fa;'>{format_currency(total_emi_monthly)}</div>
+                <div class='card-value' style='color:#4f46e5;'>{format_currency(total_emi_monthly)}</div>
                 <div class='card-sub'>Due on {active_loans.iloc[0]['Installment Day']}th of month</div>
             </div>
             """, unsafe_allow_html=True)
@@ -735,7 +764,7 @@ if st.session_state.page == "🏠 Home":
             st.markdown(f"""
             <div class='card'>
                 <div class='card-header'>📈 Progress</div>
-                <div class='card-value' style='color:#34d399;'>{progress:.1f}%</div>
+                <div class='card-value' style='color:#059669;'>{progress:.1f}%</div>
                 <div class='progress-bar'><div class='progress-fill' style='width: {min(progress,100)}%;'></div></div>
                 <div class='card-sub'>{total_emi_paid} / {total_emi_tenure} installments paid</div>
             </div>
@@ -744,8 +773,8 @@ if st.session_state.page == "🏠 Home":
         for idx, row in active_loans.iterrows():
             loan_progress = ((row['Installments Paid'] / row['Tenure (Months)']) * 100) if row['Tenure (Months)'] > 0 else 0
             st.markdown(f"""
-            <div style='background: rgba(255,255,255,0.05); backdrop-filter: blur(8px); border-radius: 16px; padding: 12px 16px; margin-bottom: 8px; border-left: 4px solid #60a5fa;'>
-                <div style='display: flex; justify-content: space-between; flex-wrap: wrap; color: #e2e8f0;'>
+            <div style='background: rgba(255,255,255,0.6); backdrop-filter: blur(8px); border-radius: 16px; padding: 12px 16px; margin-bottom: 8px; border-left: 4px solid #4f46e5; color: #1e293b;'>
+                <div style='display: flex; justify-content: space-between; flex-wrap: wrap;'>
                     <span><strong>{row['Lender']}</strong></span>
                     <span>Remaining: {format_currency(row['Remaining Due'])}</span>
                     <span>EMI: {format_currency(row['EMI Amount'])}</span>
@@ -782,18 +811,18 @@ if st.session_state.page == "🏠 Home":
         else:
             break
     
-    st.markdown(f"<div style='margin-bottom:10px; color:#fbbf24;'><strong>🔥 Current Streak: {streak} days</strong></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='margin-bottom:10px; color:#d97706;'><strong>🔥 Current Streak: {streak} days</strong></div>", unsafe_allow_html=True)
     days = list(spend_map.keys())
     for i in range(0, len(days), 7):
         cols = st.columns(7)
         for j in range(7):
             if i+j < len(days):
                 d_str = days[i+j]
-                color = "#34d399" if spend_map[d_str] == 0 else "#f87171"
+                color = "#059669" if spend_map[d_str] == 0 else "#dc2626"
                 date_obj = datetime.strptime(d_str, '%Y-%m-%d')
                 day_num = date_obj.day
                 cols[j].markdown(f"""
-                <div style='background:{color}; color:#0f172a; border-radius:12px; text-align:center; padding:8px 0; font-weight:700; font-size:1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2);'>
+                <div style='background:{color}; color:white; border-radius:12px; text-align:center; padding:8px 0; font-weight:700; font-size:1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1);'>
                     {day_num}
                 </div>
                 """, unsafe_allow_html=True)
@@ -805,7 +834,7 @@ if st.session_state.page == "🏠 Home":
         df_net['Date'] = pd.to_datetime(df_net['Date']).dt.date
         daily_sum = df_net.groupby('Date')['Amount'].sum().reset_index()
         fig_net = px.line(daily_sum, x='Date', y='Amount', title='Daily Net Cash Flow', markers=True)
-        fig_net.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#e2e8f0'), margin=dict(l=0,r=0,t=20,b=0))
+        fig_net.update_layout(plot_bgcolor='rgba(255,255,255,0.3)', paper_bgcolor='rgba(255,255,255,0)', font=dict(color='#1e293b'), margin=dict(l=0,r=0,t=20,b=0))
         st.plotly_chart(fig_net, use_container_width=True)
     else:
         st.info("No transactions yet to show Net Worth trend.")
@@ -1067,25 +1096,25 @@ elif st.session_state.page == "🎯 Budget":
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>💰 Category Budget</div>
-            <div class='card-value' style='color:#60a5fa;'>{format_currency(total_budget_val)}</div>
+            <div class='card-value' style='color:#4f46e5;'>{format_currency(total_budget_val)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_t2:
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>🎯 Master Cap</div>
-            <div class='card-value' style='color:#a78bfa;'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div>
+            <div class='card-value' style='color:#7c3aed;'>{format_currency(master_budget) if master_budget>0 else 'Not Set'}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_t3:
         st.markdown(f"""
         <div class='card'>
             <div class='card-header'>📉 Total Spent</div>
-            <div class='card-value' style='color:#f87171;'>{format_currency(total_spent_val)}</div>
+            <div class='card-value' style='color:#dc2626;'>{format_currency(total_spent_val)}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_t4:
-        status_color = "#34d399" if remaining_val >= 0 else "#f87171"
+        status_color = "#059669" if remaining_val >= 0 else "#dc2626"
         status_text = "✅ On Track" if remaining_val >= 0 else "⚠️ Over Budget"
         st.markdown(f"""
         <div class='card'>
@@ -1275,7 +1304,7 @@ elif st.session_state.page == "⚡ More":
                 df_heat['Day'] = df_heat['Date'].dt.day_name()
                 df_heat['Week'] = df_heat['Date'].dt.isocalendar().week
                 fig_heat = px.density_heatmap(df_heat, x='Day', y='Week', z='Amount', title='Spending Heatmap')
-                fig_heat.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#e2e8f0'))
+                fig_heat.update_layout(plot_bgcolor='rgba(255,255,255,0.3)', paper_bgcolor='rgba(255,255,255,0)', font=dict(color='#1e293b'))
                 st.plotly_chart(fig_heat, use_container_width=True)
 
             st.markdown("#### 🔀 Income to Expense Flow")
