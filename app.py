@@ -1404,20 +1404,20 @@ elif st.session_state.page == "⚡ More":
                 st.success("Asset added!")
                 st.rerun()
 
-    # --- IMPORT/EXPORT ---
-    with tabs[8]:
-        st.markdown("#### 📁 Data Import / Export")
-        if st.button("📥 Export All Data to Excel"):
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                st.session_state.transactions.to_excel(writer, sheet_name='Transactions', index=False)
-                st.session_state.budget.to_excel(writer, sheet_name='Budget', index=False)
-                st.session_state.accounts.to_excel(writer, sheet_name='Accounts', index=False)
-                st.session_state.investments.to_excel(writer, sheet_name='Investments', index=False)
-                st.session_state.emi.to_excel(writer, sheet_name='EMI', index=False)
-            st.download_button(label="📥 Download Excel File", data=output.getvalue(), file_name="CashDash_Backup.xlsx", mime="application/vnd.ms-excel")
-        
-        st.markdown("#### 📤 Bulk Import Transactions (CSV)")
+          if st.button("💾 Download JSON Backup"):
+            backup = {
+                'transactions': st.session_state.transactions.to_dict(),
+                'budget': st.session_state.budget.to_dict(),
+                'accounts': st.session_state.accounts.to_dict()
+            }
+            # 👇 FIX: default=str add kar diya hai
+            st.download_button(
+                label="📥 Download JSON",
+                data=json.dumps(backup, indent=2, default=str),
+                file_name="CashDash_Backup.json",
+                mime="application/json"
+            )
+                st.markdown("#### 📤 Bulk Import Transactions (CSV)")
         uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
         if uploaded_file:
             try:
